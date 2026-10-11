@@ -6,7 +6,7 @@ Mac 수신 앱 + iPhone Safari 리모컨. 같은 Wi-Fi에서 포인터 이동, �
 
 ## 설치와 연결
 
-1. [Releases](https://github.com/barojins/couch-remote-web/releases)에서 Mac DMG를 내려받고 앱을 Applications로 드래그합니다. **macOS 14 이상**, Intel 또는 Apple Silicon Mac이 필요합니다. 소스만 빌드할 때 Xcode가 필요합니다.
+1. [Releases](https://github.com/barojins/couch-remote-web/releases)에서 Mac DMG를 내려받고 앱을 Applications로 드래그합니다. **macOS 13 이상**, Intel 또는 Apple Silicon Mac이 필요합니다. 소스만 빌드할 때 Xcode가 필요합니다.
 2. 앱의 **Grant Accessibility access**를 누르고 시스템 설정에서 Couch Remote Web을 허용합니다. macOS가 로컬 네트워크 접근을 묻는 경우 허용합니다.
 3. 두 기기를 같은 개인용 Wi-Fi에 연결하고 **Start receiver**를 누릅니다. 여러 주소가 있으면 iPhone과 같은 네트워크의 주소를 선택합니다.
 4. iPhone 카메라로 QR을 읽고 Safari에서 엽니다. 양쪽 화면의 6자리 코드가 일치하는지 확인한 뒤 Mac에서 **Allow control**을 누릅니다.
@@ -22,7 +22,7 @@ Mac 수신 앱 + iPhone Safari 리모컨. 같은 Wi-Fi에서 포인터 이동, �
 - QR의 256비트 임시 토큰, Mac의 매 연결 승인, Accessibility 권한이 모두 필요합니다. 토큰과 입력을 디스크나 서버 로그에 저장하지 않습니다. QR 링크는 다른 사람에게 공유하지 마세요.
 - 선택한 사설 IPv4 LAN 인터페이스에만 바인딩합니다. 클라우드/중계 서버/광고/분석 SDK는 없습니다. Host/Origin 검사, 명령 크기 제한, 한 기기 연결 제한, 연결 만료를 적용합니다. 이러한 검사는 암호화를 대신하지 않으며 같은 네트워크의 도청·변조를 막지 못합니다.
 - 동작 속도는 Wi-Fi 지연과 Safari 이벤트 처리에 영향을 받습니다. Apple 트랙패드와 동일한 반응, 시스템 다중 손가락 제스처, 드래그는 지원 범위에 포함되지 않습니다.
-- macOS 14 미만, IPv6 전용 네트워크, 기기끼리 접근을 차단하는 게스트 Wi-Fi는 지원하지 않습니다. iPhone Safari 실기기 검증은 필요합니다.
+- macOS 13 미만, IPv6 전용 네트워크, 기기끼리 접근을 차단하는 게스트 Wi-Fi는 지원하지 않습니다. iPhone Safari 실기기 검증은 필요합니다.
 
 ## 개발
 
@@ -39,3 +39,5 @@ bash Scripts/PackageMac.sh
 ## 검증 현황
 
 로컬 Swift 테스트 7개, JavaScript 테스트 4개 통과. macOS 앱 빌드 및 Safari에서 QR 링크의 연결 코드가 Mac과 일치하는 것, 승인 전 입력 차단, 외부 Origin/인증 없는 API의 403 거부를 확인했습니다. 실제 iPhone에서의 터치 감각과 다른 Mac의 권한/호환성, Developer ID 공증은 별도 검증해야 합니다.
+
+Ventura compatibility update: the Mac deployment target is macOS 13.0, and both Intel and Apple Silicon binaries were rebuilt and checked. Actual execution on a Ventura Mac still needs device testing; the current development Mac runs a newer macOS.

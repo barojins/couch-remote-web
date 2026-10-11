@@ -2,7 +2,7 @@
 
 ## 멤버십 없는 개인 테스트
 
-`bash Scripts/PackageMac.sh`는 Intel/Apple Silicon universal 앱을 빌드하고 `dist/CouchRemoteWeb-macOS14-universal.dmg`를 만듭니다. 다른 Mac에 Xcode가 없어도 앱을 복사할 수 있지만 **Apple 공증을 받지 않은 ad-hoc 빌드**이므로 Gatekeeper 경고가 나타날 수 있습니다. [Apple의 공식 안내](https://support.apple.com/102445)에 따라 출처를 확인하세요. macOS 14 이상이 필요합니다.
+`bash Scripts/PackageMac.sh`는 Intel/Apple Silicon universal 앱을 빌드하고 `dist/CouchRemoteWeb-macOS13-universal.dmg`를 만듭니다. 다른 Mac에 Xcode가 없어도 앱을 복사할 수 있지만 **Apple 공증을 받지 않은 ad-hoc 빌드**이므로 Gatekeeper 경고가 나타날 수 있습니다. [Apple의 공식 안내](https://support.apple.com/102445)에 따라 출처를 확인하세요. macOS 13 이상이 필요합니다.
 
 ## 일반 사용자에게 배포
 

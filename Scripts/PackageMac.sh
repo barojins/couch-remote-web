@@ -3,7 +3,7 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 build_path="$project_root/build/distribution"
-output_path="$project_root/dist/CouchRemoteWeb-macOS14-universal.dmg"
+output_path="$project_root/dist/CouchRemoteWeb-macOS13-universal.dmg"
 staging_path="$(mktemp -d "${TMPDIR:-/tmp}/couchremote-package.XXXXXX")"
 trap 'rm -rf "$staging_path"' EXIT
 
@@ -28,7 +28,7 @@ ln -s /Applications "$staging_path/Applications"
 cat > "$staging_path/설치 안내.txt" <<'EOF'
 Couch Remote Web — Mac + iPhone Safari
 
-지원: macOS 14 이상, Intel 또는 Apple Silicon Mac.
+지원: macOS 13 이상, Intel 또는 Apple Silicon Mac.
 1. CouchRemoteWeb 앱을 Applications 폴더로 드래그하세요.
 2. Mac과 iPhone을 같은 신뢰할 수 있는 Wi-Fi에 연결하세요.
 3. 앱을 열고 Accessibility 권한을 허용한 뒤 Start receiver를 누르세요.
