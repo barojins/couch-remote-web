@@ -1,0 +1,33 @@
+name: CouchRemoteWeb
+options:
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  CouchRemoteWeb:
+    type: application
+    platform: macOS
+    sources:
+      - MacWeb
+      - Core
+      - path: Web
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.couchremote.web.mac
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: NO
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: Let your iPhone connect to this Mac over your local Wi-Fi network.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_APP_SANDBOX: NO
+schemes:
+  CouchRemoteWeb:
+    build:
+      targets:
+        CouchRemoteWeb: all

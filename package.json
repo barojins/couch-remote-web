@@ -1,0 +1,1 @@
+{"name":"couch-remote-web","private":true,"type":"module","scripts":{"test":"node --test Tests/web.test.mjs"}}
