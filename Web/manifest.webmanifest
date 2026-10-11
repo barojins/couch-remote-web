@@ -1,0 +1,11 @@
+{
+  "id": "/",
+  "name": "Couch Remote",
+  "short_name": "Couch Remote",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0e1415",
+  "theme_color": "#0e1415",
+  "icons": [{"src": "/icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any"}]
+}

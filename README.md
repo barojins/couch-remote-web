@@ -12,9 +12,22 @@ Mac 수신 앱 + iPhone Safari 리모컨. 같은 Wi-Fi에서 포인터 이동, �
 4. iPhone 카메라로 QR을 읽고 Safari에서 엽니다. 양쪽 화면의 6자리 코드가 일치하는지 확인한 뒤 Mac에서 **Allow control**을 누릅니다.
 5. 한 손가락으로 이동/탭/더블탭, 두 손가락으로 우클릭/스크롤합니다. Keyboard에서 텍스트를 입력하고 오른쪽 화살표로 전송합니다. Return, Backspace, 방향키 등도 제공합니다.
 
-화면을 잠그거나 Safari를 떠나면 연결이 해제됩니다. 돌아온 뒤 Reconnect와 Mac 승인이 필요합니다. 새로고침/새 탭은 QR을 다시 스캔하세요. 홈 화면 북마크로 영구 자동 연결하는 기능은 없습니다. **New connection link**는 기존 연결과 링크를 폐기하고 **Stop receiver**는 서버를 닫습니다.
+화면을 잠그거나 Safari/웹 앱을 떠나면 연결이 해제됩니다. 돌아온 뒤 Reconnect와 Mac 승인이 필요합니다. 새로고침이나 홈 화면에서 새로 실행할 때에는 Mac에 표시된 8자리 연결 코드를 입력할 수 있습니다. **New connection link**는 기존 연결과 링크를 폐기하고 **Stop receiver**는 서버를 닫습니다.
 
 초기 릴리스의 DMG는 개인 테스트용 ad-hoc 서명이며 Apple 공증을 받지 않았습니다. macOS가 차단할 수 있습니다. 정식 Developer ID 서명/공증 절차는 [배포 안내](Docs/DISTRIBUTION.md)를 참고하세요. 비공개 저장소에 접근 가능한 계정만 릴리스를 다운로드할 수 있습니다.
+
+## Safari 도구 막대 없이 사용하기
+
+1. 먼저 QR로 Safari에서 리모컨을 엽니다.
+2. Safari의 공유 메뉴 → **홈 화면에 추가(Add to Home Screen)** → **웹 앱으로 열기(Open as Web App)**를 켜고 추가합니다(iOS 26 기준).
+3. 홈 화면의 Couch Remote 아이콘으로 실행합니다. Safari 주소창/도구 막대 없이 열립니다.
+4. 연결 화면에서 Mac 앱의 **Home Screen connection code** 8자리를 입력합니다. 이어서 양쪽의 6자리 승인 코드가 일치하는지 확인하고 Mac에서 Allow control을 누릅니다.
+
+키보드 버튼은 위쪽, 빈 트랙패드는 그 아래, 연결 상태는 아래쪽에 배치했습니다. Disconnect 버튼, 트랙패드의 그림/안내 문구, 별도 WI-FI 표시와 소개 문구를 제거했습니다. 홈 제스처 영역에서 거리를 확보했지만 iOS 시스템 제스처 자체를 막지는 않습니다.
+
+앱은 서버 포트를 Mac에 저장해 재시작 후에도 같은 주소를 사용합니다. 이미 해당 포트를 쓰는 앱이 있으면 다른 Couch Remote Web 복사본을 종료하세요. 공유기가 Mac의 IP를 바꾸거나 다른 네트워크로 이동하면 QR을 다시 스캔하고 홈 화면 바로가기를 새로 추가해야 합니다. Mac 수신기는 실행 중이어야 하며 오프라인 사용은 지원하지 않습니다. QR 링크를 읽는 기존 방식도 유지됩니다.
+
+연결 토큰은 메모리에만 보관합니다. 연결 코드는 사용 후 바뀌고 New connection link/Stop receiver에서도 교체됩니다. 코드 입력은 수신기 전체 기준 1분에 최대 5회로 제한되며 올바른 코드를 알아도 Mac 승인이 필요합니다. 홈 화면 바로가기는 영구 제어 권한을 저장하지 않습니다.
 
 ## 사용 범위와 보안
 
@@ -38,6 +51,6 @@ bash Scripts/PackageMac.sh
 
 ## 검증 현황
 
-로컬 Swift 테스트 7개, JavaScript 테스트 4개 통과. macOS 앱 빌드 및 Safari에서 QR 링크의 연결 코드가 Mac과 일치하는 것, 승인 전 입력 차단, 외부 Origin/인증 없는 API의 403 거부를 확인했습니다. 실제 iPhone에서의 터치 감각과 다른 Mac의 권한/호환성, Developer ID 공증은 별도 검증해야 합니다.
+로컬 Swift 테스트 11개, JavaScript 테스트 4개 통과. macOS 앱 빌드 및 Safari에서 QR 링크의 연결 코드가 Mac과 일치하는 것, 승인 전 입력 차단, 외부 Origin/인증 없는 API의 403 거부를 확인했습니다. 기존 v0.1.1은 사용자가 Ventura에서 동작을 확인했습니다. 이번 홈 화면 실행/재접속과 터치 감각은 실제 iPhone에서 추가 확인해야 하며, Developer ID 공증은 아직 진행하지 않았습니다.
 
-Ventura compatibility update: the Mac deployment target is macOS 13.0, and both Intel and Apple Silicon binaries were rebuilt and checked. Actual execution on a Ventura Mac still needs device testing; the current development Mac runs a newer macOS.
+Ventura compatibility update: the Mac deployment target is macOS 13.0, and both Intel and Apple Silicon binaries were rebuilt and checked. The user confirmed v0.1.1 runs on Ventura. This update still needs real iPhone Home Screen testing; the current development Mac runs a newer macOS.

@@ -53,9 +53,12 @@ private struct WebSetupView: View {
                     } else if !host.isApproved {
                         if let image = qrCode(host.url) {
                             Image(nsImage: image).interpolation(.none).resizable().scaledToFit()
-                                .frame(width: 210, height: 210).padding(12).background(.white)
+                                .frame(width: 170, height: 170).padding(12).background(.white)
                         }
-                        Text("Same Wi-Fi → iPhone Camera → scan → open in Safari.").font(.callout)
+                        Text("Scan to connect in Safari.").font(.callout)
+                        Text("Home Screen connection code").font(.caption).foregroundStyle(.secondary)
+                        Text(host.entryCode).font(.system(size: 26, weight: .medium, design: .monospaced)).textSelection(.enabled)
+                        Text("Safari → Share → Add to Home Screen → Open as Web App. On future launches, enter this code.").font(.caption).foregroundStyle(.secondary)
                         HStack {
                             Text(host.url.components(separatedBy: "#")[0]).font(.caption.monospaced())
                             Button("Copy link") {

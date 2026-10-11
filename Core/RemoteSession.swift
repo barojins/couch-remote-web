@@ -2,6 +2,9 @@ import Foundation
 
 struct RemoteSession {
     private(set) var token = Self.newToken()
+    private(set) var entryCode = Self.newEntryCode()
+    private var entryAttempts = 0
+    private var entryWindow = Date.distantPast
     private(set) var client: String?
     private(set) var code: String?
     private(set) var approved = false
@@ -11,6 +14,18 @@ struct RemoteSession {
     static func newToken() -> String {
         Data((0..<32).map { _ in UInt8.random(in: .min ... .max) }).base64EncodedString()
             .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+    }
+    private static func newEntryCode() -> String { String(format: "%08d", Int.random(in: 0...99999999)) }
+    // A Home Screen launch has no token. Limit code guesses across all clients.
+    mutating func redeemEntryCode(_ value: String, client id: String, now: Date = Date()) -> Int {
+        if now.timeIntervalSince(entryWindow) >= 60 { entryWindow = now; entryAttempts = 0 }
+        guard entryAttempts < 5 else { return 429 }
+        entryAttempts += 1
+        guard value == entryCode else { return 403 }
+        expire(now: now)
+        guard client == nil, connect(id, now: now) else { return 409 }
+        entryCode = Self.newEntryCode()
+        return 200
     }
     func authenticates(_ value: String?) -> Bool {
         guard let value else { return false }
@@ -48,7 +63,7 @@ struct RemoteSession {
         }
     }
     mutating func disconnect() { client = nil; code = nil; approved = false }
-    mutating func revoke() { disconnect(); token = Self.newToken() }
+    mutating func revoke() { disconnect(); token = Self.newToken(); entryCode = Self.newEntryCode() }
 }
 
 struct RemoteAPI {
@@ -66,10 +81,20 @@ struct RemoteAPI {
     mutating func handle(_ request: HTTPRequest, hasPermission: Bool,
                          execute: ([RemoteCommand]) -> Void) -> HTTPResponse {
         guard accepts(request), request.method == "POST", request.headers["origin"] == origin,
-              request.headers["content-type"]?.lowercased().hasPrefix("application/json") == true,
-              session.authenticates(request.headers["authorization"]) else { return HTTPResponse(403, json: ["error": "Connection not authorized."]) }
+              request.headers["content-type"]?.lowercased().hasPrefix("application/json") == true else { return HTTPResponse(403, json: ["error": "Connection not authorized."]) }
         guard let id = request.headers["x-couch-client"], UUID(uuidString: id) != nil else { return HTTPResponse(400, json: ["error": "Invalid client."]) }
+        if request.path == "/api/pair" {
+            struct Pair: Decodable { let code: String }
+            guard let pair = try? JSONDecoder().decode(Pair.self, from: request.body) else { return HTTPResponse(400, json: ["error": "Enter the code shown on your Mac."]) }
+            let result = session.redeemEntryCode(pair.code, client: id)
+            guard result == 200 else {
+                return HTTPResponse(result, json: ["error": result == 429 ? "Too many attempts. Wait one minute and try again." : result == 409 ? "Another phone is connected. Disconnect it on the Mac." : "That code is incorrect or expired. Check your Mac."])
+            }
+            return HTTPResponse(json: ["token": session.token, "state": "pending", "code": session.code ?? ""])
+        }
+        guard session.authenticates(request.headers["authorization"]) else { return HTTPResponse(403, json: ["error": "Connection link expired. Enter the code shown on your Mac."]) }
         if request.path == "/api/connect" {
+            if session.client == id { session.disconnect() }
             guard session.connect(id) else { return HTTPResponse(409, json: ["error": "Another phone is connected. Disconnect it on the Mac."]) }
         } else if !session.touch(id) { return HTTPResponse(401, json: ["error": "Connection expired. Scan the Mac's QR code again."]) }
         switch request.path {

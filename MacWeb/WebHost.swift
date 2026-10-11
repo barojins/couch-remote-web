@@ -6,6 +6,7 @@ final class WebHost: ObservableObject {
     @Published private(set) var message = "Start the receiver to connect your iPhone."
     @Published private(set) var url = ""
     @Published private(set) var approvalCode: String?
+    @Published private(set) var entryCode = ""
     @Published private(set) var hasPermission = false
     @Published private(set) var isRunning = false
     @Published private(set) var isApproved = false
@@ -23,7 +24,8 @@ final class WebHost: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.api.session.expire()
-            self.publish()
+            if self.isRunning { self.publish() }
+            else { self.hasPermission = self.input.hasPermission }
         }
         hasPermission = input.hasPermission
     }
@@ -39,21 +41,25 @@ final class WebHost: ObservableObject {
         }
         do {
             let parameters = NWParameters.tcp
+            let savedPort = UserDefaults.standard.integer(forKey: "receiverPort")
+            let port = (1024...65535).contains(savedPort) ? NWEndpoint.Port(rawValue: UInt16(savedPort))! : .any
+            // NWListener applies the saved port; setting it in both places is invalid.
             parameters.requiredLocalEndpoint = .hostPort(host: .init(address), port: .any)
-            let listener = try NWListener(using: parameters, on: .any)
+            let listener = try NWListener(using: parameters, on: port)
             self.listener = listener
             listener.stateUpdateHandler = { [weak self, weak listener] state in
                 guard let self, let listener, self.listener === listener else { return }
                 switch state {
                 case .ready:
                     guard let port = listener.port else { return }
+                    UserDefaults.standard.set(Int(port.rawValue), forKey: "receiverPort")
                     self.api.authority = "\(self.address):\(port.rawValue)"
                     self.isRunning = true
                     self.updateURL()
                     self.publish()
                 case .failed:
                     self.stop()
-                    self.message = "Could not start. Check Local Network permission and your Wi-Fi connection."
+                    self.message = "Could not start. Quit other copies of Couch Remote Web, then check Local Network permission and Wi-Fi."
                 default: break
                 }
             }
@@ -86,6 +92,7 @@ final class WebHost: ObservableObject {
     private func publish() {
         hasPermission = input.hasPermission
         approvalCode = api.session.code
+        entryCode = api.session.entryCode
         isApproved = api.session.approved
         message = !isRunning ? "Receiver stopped" : approvalCode != nil ? "Compare the code on your iPhone before allowing control." : isApproved ? "iPhone connected" : "Scan the QR code with your iPhone."
     }
@@ -101,7 +108,7 @@ final class WebHost: ObservableObject {
     private func handle(_ request: HTTPRequest) -> HTTPResponse {
         guard isRunning, api.accepts(request) else { return HTTPResponse(403, json: ["error": "Connection not allowed."]) }
         if request.method == "GET" {
-            let assets = ["/": ("index.html", "text/html; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8"), "/gesture.js": ("gesture.js", "text/javascript; charset=utf-8"), "/app.css": ("app.css", "text/css; charset=utf-8"), "/icon.png": ("icon.png", "image/png")]
+            let assets = ["/": ("index.html", "text/html; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8"), "/gesture.js": ("gesture.js", "text/javascript; charset=utf-8"), "/app.css": ("app.css", "text/css; charset=utf-8"), "/icon.png": ("icon.png", "image/png"), "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json")]
             guard let (name, type) = assets[request.path],
                   let directory = Bundle.main.resourceURL?.appendingPathComponent("Web"),
                   let data = try? Data(contentsOf: directory.appendingPathComponent(name)) else { return HTTPResponse(404, json: ["error": "Not found."]) }

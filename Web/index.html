@@ -1,11 +1,33 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#0e1415"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Couch Remote"><title>Couch Remote</title><link rel="apple-touch-icon" href="/icon.png"><link rel="stylesheet" href="/app.css"><script type="module" src="/app.js"></script></head>
-<body><main>
-<header><div class="eyebrow">COUCH REMOTE <span>WI-FI</span></div><h1>Make yourself comfortable.</h1><p id="status" role="status">Connecting…</p></header>
-<section id="pairing" hidden><div id="code"></div><p>Compare this code and allow control on your Mac.</p></section>
-<div id="trackpad" role="application" aria-label="Mac trackpad" aria-describedby="hint" tabindex="0"><div><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="9" y="12" width="46" height="40" rx="9"/><path d="M21 24v12m11-12v12m11-12v12"/></svg><p id="hint">Slide to move<br><small>Tap to click · Two-finger tap to right-click<br>Two fingers to scroll</small></p></div></div>
-<button id="keyboard" class="wide" disabled>⌨ <span>Keyboard</span></button>
-<button id="connect" hidden>Reconnect</button><button id="disconnect" class="quiet">Disconnect</button>
-</main>
-<dialog id="keyboardDialog"><div class="dialog-heading"><h2>Keyboard</h2><button id="done" class="quiet">Done</button></div><form id="composer"><textarea id="text" rows="1" placeholder="Type…" aria-label="Text to send" maxlength="4096"></textarea><button id="send" aria-label="Send text" disabled>↑</button></form><div id="keys"><button data-key="returnKey">Return</button><button data-key="backspace" aria-label="Backspace">⌫</button><button data-key="escape">Esc</button><button data-key="space">Space</button><button data-key="tab">Tab</button><button data-key="up" aria-label="Up arrow">↑</button><button data-key="left" aria-label="Left arrow">←</button><button data-key="down" aria-label="Down arrow">↓</button><button data-key="right" aria-label="Right arrow">→</button></div><p id="keyboardStatus" role="status"></p></dialog>
-</body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0e1415">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Couch Remote">
+  <title>Couch Remote</title>
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <header><h1>Couch Remote</h1><button id="keyboard" disabled><span aria-hidden="true">⌨</span> Keyboard</button></header>
+    <form id="entry" hidden>
+      <label for="entryCode">Mac connection code</label>
+      <div class="entry-row"><input id="entryCode" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{8}" maxlength="8" placeholder="8 digits" required><button id="pairButton" type="submit">Connect</button></div>
+    </form>
+    <section id="pairing" hidden><div id="code"></div><p>Compare this code and allow control on your Mac.</p></section>
+    <div id="trackpad" role="application" aria-label="Mac trackpad: slide to move, tap to click, two-finger tap to right-click, two fingers to scroll" tabindex="0"></div>
+    <footer><button id="connect" hidden>Reconnect</button><p id="status" role="status">Connecting…</p></footer>
+  </main>
+  <dialog id="keyboardDialog">
+    <div class="dialog-heading"><h2>Keyboard</h2><button id="done" class="quiet">Done</button></div>
+    <form id="composer"><textarea id="text" rows="1" placeholder="Type…" aria-label="Text to send" maxlength="4096"></textarea><button id="send" aria-label="Send text" disabled>↑</button></form>
+    <div id="keys"><button data-key="returnKey">Return</button><button data-key="backspace" aria-label="Backspace">⌫</button><button data-key="escape">Esc</button><button data-key="space">Space</button><button data-key="tab">Tab</button><button data-key="up" aria-label="Up arrow">↑</button><button data-key="left" aria-label="Left arrow">←</button><button data-key="down" aria-label="Down arrow">↓</button><button data-key="right" aria-label="Right arrow">→</button></div>
+    <p id="keyboardStatus" role="status"></p>
+  </dialog>
+</body>
+</html>

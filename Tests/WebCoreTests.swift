@@ -86,4 +86,54 @@ final class WebCoreTests: XCTestCase {
         XCTAssertFalse(session.approved)
         XCTAssertNil(session.client)
     }
+    func testHomeScreenCodeRequiresApprovalAndCannotBeReused() throws {
+        var api = RemoteAPI(authority: "192.168.1.2:8000")
+        let client = UUID().uuidString, entryCode = api.session.entryCode
+        var headers = request("/api/pair", api: api, client: client).headers
+        headers.removeValue(forKey: "authorization")
+        let req = HTTPRequest(method: "POST", path: "/api/pair", headers: headers,
+                              body: try JSONSerialization.data(withJSONObject: ["code": entryCode]))
+        let result = api.handle(req, hasPermission: true) { _ in XCTFail("Pairing executed input") }
+        XCTAssertEqual(result.code, 200)
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: result.body) as? [String: String])
+        XCTAssertEqual(body["token"], api.session.token)
+        XCTAssertEqual(body["state"], "pending")
+        XCTAssertFalse(api.session.approved)
+        let command = request("/api/commands", api: api, client: client, body: "[{\"type\":\"click\"}]")
+        XCTAssertEqual(api.handle(command, hasPermission: true) { _ in XCTFail("Approval bypassed") }.code, 403)
+        api.session.disconnect()
+        XCTAssertEqual(api.handle(req, hasPermission: true) { _ in }.code, 403)
+    }
+    func testHomeScreenCodeRateLimitCannotBeResetByClientOrRevocation() {
+        var session = RemoteSession(); let now = Date()
+        for _ in 0..<5 { XCTAssertEqual(session.redeemEntryCode("bad", client: UUID().uuidString, now: now), 403) }
+        session.revoke()
+        XCTAssertEqual(session.redeemEntryCode(session.entryCode, client: UUID().uuidString, now: now.addingTimeInterval(59)), 429)
+        XCTAssertEqual(session.redeemEntryCode(session.entryCode, client: UUID().uuidString, now: now.addingTimeInterval(60)), 200)
+    }
+    func testHomeScreenPairingRejectsForeignOriginAndBusyReceiver() throws {
+        var api = RemoteAPI(authority: "192.168.1.2:8000")
+        let client = UUID().uuidString
+        var headers = request("/api/pair", api: api, client: client).headers
+        headers["origin"] = "http://attacker.example"
+        let data = try JSONSerialization.data(withJSONObject: ["code": api.session.entryCode])
+        var req = HTTPRequest(method: "POST", path: "/api/pair", headers: headers, body: data)
+        XCTAssertEqual(api.handle(req, hasPermission: true) { _ in }.code, 403)
+        XCTAssertNil(api.session.client)
+        XCTAssertTrue(api.session.connect(UUID().uuidString)); api.session.approve()
+        headers["origin"] = api.origin
+        req = HTTPRequest(method: "POST", path: "/api/pair", headers: headers, body: data)
+        XCTAssertEqual(api.handle(req, hasPermission: true) { _ in }.code, 409)
+        XCTAssertTrue(api.session.approved)
+    }
+    func testReconnectAlwaysRequiresFreshMacApproval() {
+        var api = RemoteAPI(authority: "192.168.1.2:8000")
+        let client = UUID().uuidString
+        XCTAssertTrue(api.session.connect(client)); api.session.approve()
+        let req = request("/api/connect", api: api, client: client)
+        XCTAssertEqual(api.handle(req, hasPermission: true) { _ in }.code, 200)
+        XCTAssertFalse(api.session.approved)
+        XCTAssertNotNil(api.session.code)
+    }
+
 }
