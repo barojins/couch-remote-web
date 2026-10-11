@@ -51,7 +51,7 @@ private struct WebSetupView: View {
                         Text(code).font(.system(size: 36, weight: .semibold, design: .monospaced))
                         HStack {
                             Button("Decline") { host.disconnect() }
-                            Button("Allow control") { host.approve(); if host.hasPermission { NSApplication.shared.hide(nil) } }.buttonStyle(.borderedProminent)
+                            Button("Trust this phone") { host.approve(); if host.hasPermission { NSApplication.shared.hide(nil) } }.buttonStyle(.borderedProminent)
                         }
                     } else if !host.isApproved {
                         if let image = qrCode(host.url) {
@@ -59,9 +59,9 @@ private struct WebSetupView: View {
                                 .frame(width: 170, height: 170).padding(12).background(.white)
                         }
                         Text("Scan to connect in Safari.").font(.callout)
-                        Text("Home Screen connection code").font(.caption).foregroundStyle(.secondary)
+                        Text("First-time connection code").font(.caption).foregroundStyle(.secondary)
                         Text(host.entryCode).font(.system(size: 26, weight: .medium, design: .monospaced)).textSelection(.enabled)
-                        Text("Safari → Share → Add to Home Screen → Open as Web App. On future launches, enter this code.").font(.caption).foregroundStyle(.secondary)
+                        Text("Safari → Share → Add to Home Screen → Open as Web App. Add to Home Screen before approving. Open that icon, enter this code once, then trust the phone. Future launches reconnect automatically.").font(.caption).foregroundStyle(.secondary)
                         HStack {
                             Text(host.url.components(separatedBy: "#")[0]).font(.caption.monospaced())
                             Button("Copy link") {
@@ -83,6 +83,17 @@ private struct WebSetupView: View {
                     HStack {
                         Button("Refresh") { host.refreshAddresses() }
                         Button("Start receiver") { host.start() }.buttonStyle(.borderedProminent).disabled(host.address.isEmpty)
+                    }
+                }
+                LoginItemView()
+                if !host.trustedDevices.isEmpty {
+                    Text("Trusted phones").font(.headline)
+                    ForEach(host.trustedDevices) { device in
+                        HStack {
+                            Text("Phone · \(device.id.uuidString.prefix(8))").font(.caption)
+                            Spacer()
+                            Button("Forget") { host.forgetDevice(device.id) }
+                        }
                     }
                 }
                 Divider()

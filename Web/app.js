@@ -1,13 +1,17 @@
 import {Gesture, coalesce} from './gesture.js';
+import {loadConnection, saveConnection, forgetConnection, retryDelay} from './connection.js';
 const $ = id => document.getElementById(id);
-let token = location.hash.slice(1);
+let storage; try { storage=localStorage; } catch {}
+const saved=loadConnection(storage);
+let token = saved?.token || location.hash.slice(1);
 history.replaceState(null, '', location.pathname);
-// Secrets stay in memory. Home Screen launches use the Mac entry code.
+// Persist only a credential issued after explicit Mac approval, never the QR token.
 const random = crypto.getRandomValues(new Uint8Array(16));
 random[6] = (random[6] & 15) | 64; random[8] = (random[8] & 63) | 128;
 const hex = [...random].map(x=>x.toString(16).padStart(2,'0')).join('');
-const client = `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+const client = saved?.client || `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 let ready=false, active=false, queue=[], sending=false, polling=null, frame=null, tapTimer=null, lastTap=0, textBusy=false, generation=0;
+let retryTimer=null, attempts=0, connecting=false;
 const gesture = new Gesture();
 function setMessage(text) { $('status').textContent=text; $('keyboardStatus').textContent=text; }
 function controls() {
@@ -26,36 +30,46 @@ async function api(path,body={}) {
   } finally { clearTimeout(timeout); }
 }
 function apply(result) {
+  if(result.deviceToken) {
+    token=result.deviceToken;
+    saveConnection(storage,token,client);
+  }
   ready=result.state==='ready';
+  attempts=0;
   $('entry').hidden=true; $('pairing').hidden=result.state!=='pending'; $('code').textContent=result.code;
   setMessage({ready:'Connected over Wi-Fi',pending:'Approve the code on your Mac.',permission:'Enable Accessibility access on your Mac.',disconnected:'Disconnected. Scan the Mac’s QR code again.'}[result.state] || 'Connecting…');
   if(!ready) { queue=[]; gesture.reset(); }
   controls();
 }
 function stop(message) {
-  generation++; ready=false; active=false; queue=[]; gesture.reset();
+  generation++; connecting=false; clearTimeout(retryTimer); retryTimer=null; ready=false; active=false; queue=[]; gesture.reset();
   clearTimeout(polling); clearTimeout(tapTimer); tapTimer=null; cancelAnimationFrame(frame); frame=null; textBusy=false;
   $('pairing').hidden=true; $('entry').hidden=!!token; $('connect').hidden=!token; setMessage(message); controls();
+}
+function recover(message) {
+  stop(message);
+  if(token && !document.hidden)retryTimer=setTimeout(connect,retryDelay(attempts++));
 }
 async function poll() {
   if(!active) return;
   const current=generation;
-  try { const r=await api('/api/status'); if(current!==generation)return; apply(r); if(r.state==='disconnected'){stop('Disconnected. Reconnect or scan the Mac’s QR code.');return;} }
-  catch { if(current===generation)stop('Connection lost. Text may be partially sent; check the Mac before retrying.'); return; }
+  try { const r=await api('/api/status'); if(current!==generation)return; apply(r); if(r.state==='disconnected'){recover('Reconnecting…');return;} }
+  catch { if(current===generation)recover('Waiting for your Mac… Reconnecting automatically.'); return; }
   polling=setTimeout(poll,2000);
 }
 async function connect() {
+  if(document.hidden || connecting || active)return;
   if(!token) {stop('Enter the connection code shown on your Mac.');return;}
-  stop('Connecting…'); const current=generation; $('connect').hidden=true;
-  try {const r=await api('/api/connect'); if(current!==generation)return; active=true; apply(r); poll();}
-  catch(error){if(current===generation){if(error.status===403)token='';stop(error.message);}}
+  stop('Connecting…'); connecting=true; const current=generation; $('connect').hidden=true;
+  try {const r=await api('/api/connect'); if(current!==generation)return; connecting=false; active=true; apply(r); poll();}
+  catch(error){if(current===generation){if(error.status===403){token='';forgetConnection(storage);stop('Approve this phone again using the code on your Mac.');}else recover(error.message);}}
 }
 function enqueue(command) {
   if(!ready || textBusy || !command)return;
   const merged=coalesce(queue.at(-1),command);
   if(merged)queue[queue.length-1]=merged;
   else if(queue.length<256)queue.push(command);
-  else {stop('Connection too slow. Reconnect to continue.');return;}
+  else {recover('Connection too slow. Reconnecting…');return;}
   schedule();
 }
 function schedule(){if(frame===null)frame=requestAnimationFrame(()=>{frame=null;flush();});}
@@ -63,7 +77,7 @@ async function flush(){
   if(sending || !ready || !queue.length)return;
   sending=true; const current=generation; const batch=queue.splice(0,32);
   try{const r=await api('/api/commands',batch);if(current===generation)apply(r);}
-  catch(error){if(current===generation)stop(error.message+' Check the Mac before retrying.');}
+  catch(error){if(current===generation)recover(error.message+' Input was not replayed.');}
   finally{sending=false;if(queue.length)schedule();}
 }
 $('trackpad').addEventListener('pointerdown',e=>{if(!ready)return;e.preventDefault();$('trackpad').setPointerCapture(e.pointerId);gesture.down(e.pointerId,e.clientX,e.clientY,e.timeStamp);if(gesture.maxTouches===2){clearTimeout(tapTimer);tapTimer=null;}});
@@ -84,12 +98,13 @@ $('composer').onsubmit=async e=>{
   if(new TextEncoder().encode(text).length>4096){setMessage('Send up to 4 KB at a time.');return;}
   textBusy=true; controls(); const current=generation;
   try{const r=await api('/api/commands',[{type:'text',text}]);if(current!==generation)return;$('text').value='';apply(r);}
-  catch(error){if(current===generation)stop(error.message+' Text may be partially sent; check the Mac before retrying.');}
+  catch(error){if(current===generation)recover(error.message+' Text may be partially sent; check the Mac before sending it again.');}
   finally{textBusy=false;controls();}
 };
-function disconnect(){
-  if(active)fetch('/api/disconnect',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'X-Couch-Client':client},body:'{}',keepalive:true}).catch(()=>{});
-  stop('Disconnected. Reconnect when you’re ready.');
+function suspend(){
+  // Safari can freeze or kill this page. Release only local input state; the Mac
+  // expires the live session, while the approved device credential remains valid.
+  stop('Ready to reconnect when you return.');
 }
 $('connect').onclick=connect;
 $('entry').onsubmit=async e=>{
@@ -103,6 +118,8 @@ $('entry').onsubmit=async e=>{
   } catch(error){if(current===generation)stop(error.message);}
   finally{$('pairButton').disabled=false;}
 };
-addEventListener('pagehide',disconnect);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)disconnect();});
+addEventListener('pagehide',suspend);
+addEventListener('pageshow',()=>{if(!document.hidden)connect();});
+addEventListener('online',()=>{if(!active)connect();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)suspend();else connect();});
 connect();

@@ -33,11 +33,14 @@ Couch Remote Web — Mac + iPhone Safari
 2. Mac과 iPhone을 같은 신뢰할 수 있는 Wi-Fi에 연결하세요.
 3. 앱을 열고 Accessibility 권한을 허용한 뒤 Start receiver를 누르세요.
 4. iPhone 카메라로 QR 코드를 스캔하고 Safari에서 여세요.
-5. 두 화면의 코드를 비교하고 Mac에서 Allow control을 누르세요.
+5. Safari에서 바로 쓸 때는 두 코드를 비교하고 Trust this phone을 누르세요.
 6. Safari의 공유 메뉴 → 홈 화면에 추가 → 웹 앱으로 열기를 켜세요.
-   홈 화면에서 실행할 때 Mac의 Home Screen connection code 8자리를
-   입력한 뒤, 새 승인 코드를 비교하고 Mac에서 Allow control을 누르세요.
-   Mac의 IP가 바뀌면 새 QR로 연결하고 바로가기를 다시 추가하세요.
+   홈 화면 앱에서 처음 실행할 때 Mac의 First-time connection code
+   8자리를 입력하고 코드를 비교한 뒤 Trust this phone을 누르세요.
+   다음부터 저장된 승인으로 자동 재연결됩니다.
+   이전 IP 주소 바로가기는 새 .local 주소의 QR로 한 번 다시 추가하세요.
+7. Mac에서 Launch at login을 켜면 로그인할 때 수신기를 실행합니다.
+   Trusted phones의 Forget으로 승인한 휴대폰을 철회할 수 있습니다.
 
 iPhone 앱 설치나 개발자 멤버십은 필요하지 않습니다.
 연결은 HTTP이며 암호화되지 않습니다. 개인용 신뢰 Wi-Fi에서만 사용하고

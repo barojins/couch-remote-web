@@ -1,6 +1,7 @@
 import AppKit
 import Network
 import Darwin
+import SystemConfiguration
 
 final class WebHost: ObservableObject {
     @Published private(set) var message = "Start the receiver to connect your iPhone."
@@ -10,6 +11,7 @@ final class WebHost: ObservableObject {
     @Published private(set) var hasPermission = false
     @Published private(set) var isRunning = false
     @Published private(set) var isApproved = false
+    @Published private(set) var trustedDevices: [TrustedWebDevice] = []
     @Published var address = ""
     @Published private(set) var addresses: [String] = []
     var onApproval: (() -> Void)?
@@ -18,23 +20,39 @@ final class WebHost: ObservableObject {
     private var api = RemoteAPI(authority: "")
     private let input = InputController()
     private var timer: Timer?
+    private var networkTicks = 0
 
     init() {
+        if let saved = UserDefaults.standard.data(forKey: "trustedWebDevices"),
+           let devices = try? JSONDecoder().decode([TrustedWebDevice].self, from: saved) {
+            api.session.trustedDevices = devices
+            trustedDevices = devices
+        }
         refreshAddresses()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.api.session.expire()
+            self.networkTicks += 1
+            if self.networkTicks % 5 == 0, UserDefaults.standard.bool(forKey: "receiverEnabled") {
+                let available = Self.localAddresses()
+                if self.listener == nil || !available.contains(self.address) {
+                    self.refreshAddresses()
+                    if !self.address.isEmpty { self.start() }
+                }
+            }
             if self.isRunning { self.publish() }
             else { self.hasPermission = self.input.hasPermission }
         }
         hasPermission = input.hasPermission
+        if UserDefaults.standard.bool(forKey: "receiverEnabled") { start() }
     }
     func refreshAddresses() {
         addresses = Self.localAddresses()
         if !addresses.contains(address) { address = addresses.first ?? "" }
     }
     func start() {
-        stop()
+        stop(keepEnabled: true)
+        UserDefaults.standard.set(true, forKey: "receiverEnabled")
         guard !address.isEmpty, Self.localAddresses().contains(address) else {
             message = "Connect this Mac to your private Wi-Fi network, then refresh."
             return
@@ -53,12 +71,13 @@ final class WebHost: ObservableObject {
                 case .ready:
                     guard let port = listener.port else { return }
                     UserDefaults.standard.set(Int(port.rawValue), forKey: "receiverPort")
-                    self.api.authority = "\(self.address):\(port.rawValue)"
+                    let hostname = (SCDynamicStoreCopyLocalHostName(nil) as String?)?.lowercased()
+                    self.api.authority = "\(hostname.map { $0 + ".local" } ?? self.address):\(port.rawValue)"
                     self.isRunning = true
                     self.updateURL()
                     self.publish()
                 case .failed:
-                    self.stop()
+                    self.stop(keepEnabled: true)
                     self.message = "Could not start. Quit other copies of Couch Remote Web, then check Local Network permission and Wi-Fi."
                 default: break
                 }
@@ -68,7 +87,8 @@ final class WebHost: ObservableObject {
             message = "Starting…"
         } catch { message = "Could not start the local receiver. Try refreshing your network address." }
     }
-    func stop() {
+    func stop(keepEnabled: Bool = false) {
+        if !keepEnabled { UserDefaults.standard.set(false, forKey: "receiverEnabled") }
         listener?.cancel()
         listener = nil
         let previous = Array(connections.values)
@@ -86,7 +106,20 @@ final class WebHost: ObservableObject {
         updateURL()
         publish()
     }
-    func approve() { api.session.approve(); publish() }
+    func approve() { api.session.approve(); saveTrust(); publish() }
+    func forgetDevice(_ id: UUID) {
+        api.session.forgetDevice(id)
+        saveTrust()
+        input.resetPointer()
+        updateURL()
+        publish()
+    }
+    private func saveTrust() {
+        trustedDevices = api.session.trustedDevices
+        if let data = try? JSONEncoder().encode(trustedDevices) {
+            UserDefaults.standard.set(data, forKey: "trustedWebDevices")
+        }
+    }
     func requestPermission() { input.requestPermission() }
     private func updateURL() { url = isRunning ? "http://\(api.authority)/#\(api.session.token)" : "" }
     private func publish() {
@@ -94,7 +127,7 @@ final class WebHost: ObservableObject {
         approvalCode = api.session.code
         entryCode = api.session.entryCode
         isApproved = api.session.approved
-        message = !isRunning ? "Receiver stopped" : approvalCode != nil ? "Compare the code on your iPhone before allowing control." : isApproved ? "iPhone connected" : "Scan the QR code with your iPhone."
+        message = !isRunning ? "Receiver stopped" : approvalCode != nil ? "Compare the code on your iPhone before allowing control." : isApproved ? "iPhone connected" : trustedDevices.isEmpty ? "Scan the QR code with your iPhone." : "Ready for your trusted phone. Open Couch Remote on your iPhone."
     }
     private func accept(_ connection: NWConnection) {
         guard isRunning, connections.count < 32 else { connection.cancel(); return }
@@ -108,7 +141,7 @@ final class WebHost: ObservableObject {
     private func handle(_ request: HTTPRequest) -> HTTPResponse {
         guard isRunning, api.accepts(request) else { return HTTPResponse(403, json: ["error": "Connection not allowed."]) }
         if request.method == "GET" {
-            let assets = ["/": ("index.html", "text/html; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8"), "/gesture.js": ("gesture.js", "text/javascript; charset=utf-8"), "/app.css": ("app.css", "text/css; charset=utf-8"), "/icon.png": ("icon.png", "image/png"), "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json")]
+            let assets = ["/": ("index.html", "text/html; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8"), "/gesture.js": ("gesture.js", "text/javascript; charset=utf-8"), "/connection.js": ("connection.js", "text/javascript; charset=utf-8"), "/app.css": ("app.css", "text/css; charset=utf-8"), "/icon.png": ("icon.png", "image/png"), "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json")]
             guard let (name, type) = assets[request.path],
                   let directory = Bundle.main.resourceURL?.appendingPathComponent("Web"),
                   let data = try? Data(contentsOf: directory.appendingPathComponent(name)) else { return HTTPResponse(404, json: ["error": "Not found."]) }

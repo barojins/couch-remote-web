@@ -19,3 +19,80 @@ test('fractional motion, direction and coalescing retain intent',()=>{
 test('cancelled or unknown touches cannot click',()=>{
   const g=new Gesture();assert.equal(g.up(9,1),null);g.down(1,0,0,0);g.reset();assert.equal(g.up(1,50),null);
 });
+
+const {loadConnection,saveConnection,forgetConnection,retryDelay}=await import('../Web/connection.js');
+test('approved connection survives reload and can be forgotten',()=>{
+  const values=new Map(), storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+  const token='a'.repeat(43),client='01234567-89ab-4def-8123-456789abcdef';
+  assert.equal(loadConnection(storage),null);
+  assert.equal(saveConnection(storage,token,client),true);
+  assert.deepEqual(loadConnection(storage),{token,client});
+  forgetConnection(storage);
+  assert.equal(loadConnection(storage),null);
+});
+test('blocked storage and malformed credentials do not break remote',()=>{
+  assert.equal(loadConnection(undefined),null);
+  assert.equal(saveConnection(undefined,'token','client'),false);
+  assert.equal(loadConnection({getItem:()=>'{'}),null);
+  assert.equal(loadConnection({getItem:()=>JSON.stringify({token:'bad',client:'bad'})}),null);
+  assert.deepEqual([0,1,2,3,4,5,50].map(retryDelay),[1000,2000,4000,8000,16000,30000,30000]);
+});
+
+const {readFile}=await import('node:fs/promises');
+const {runInNewContext}=await import('node:vm');
+const {webcrypto}=await import('node:crypto');
+const appSource=(await readFile(new URL('../Web/app.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+function browserHarness({saved=false,fail=false}={}) {
+  const token='t'.repeat(43), client='01234567-89ab-4def-8123-456789abcdef';
+  const values=new Map(), storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+  if(saved)saveConnection(storage,token,client);
+  const elements=new Map(), listeners={}, timers=new Map(), calls=[];
+  let timerID=0;
+  const get=id=>{
+    if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,value:'',textContent:'',style:{},classList:{toggle(){}},addEventListener(){},focus(){},showModal(){},close(){}});
+    return elements.get(id);
+  };
+  const document={hidden:false,getElementById:get,querySelectorAll:()=>[],addEventListener:(name,fn)=>listeners[name]=fn};
+  let state='ready', failure=fail, rejected=false;
+  const context={document,location:{hash:saved?'':'#'+'q'.repeat(43),pathname:'/'},history:{replaceState(){}},localStorage:storage,
+    crypto:webcrypto,Gesture,coalesce,loadConnection,saveConnection,forgetConnection,retryDelay,AbortController,TextEncoder,
+    setTimeout:(fn,ms)=>{const id=++timerID;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),
+    requestAnimationFrame:fn=>{const id=++timerID;timers.set(id,{fn,ms:16});return id;},cancelAnimationFrame:id=>timers.delete(id),
+    addEventListener:(name,fn)=>listeners[name]=fn,
+    fetch:async(path,options)=>{
+      calls.push({path,options});
+      if(failure)throw new Error('offline');
+      return {ok:!rejected,status:rejected?403:200,json:async()=>rejected?{error:'revoked'}:{state,code:'',...(!saved && path==='/api/status'?{deviceToken:token}:{})}};
+    }
+  };
+  runInNewContext(appSource,context);
+  return {get,document,listeners,timers,calls,storage,token,
+    setFailure:value=>failure=value,setRejected:value=>rejected=value,setState:value=>state=value};
+}
+test('page hide does not disconnect; returning reuses approved credential without replaying input',async()=>{
+  const page=browserHarness();
+  await settle();
+  assert.equal(loadConnection(page.storage).token,page.token);
+  page.document.hidden=true;page.listeners.visibilitychange();
+  assert.equal(page.get('keyboard').disabled,true);
+  assert.equal(page.calls.some(c=>c.path==='/api/disconnect'),false);
+  page.document.hidden=false;page.listeners.visibilitychange();
+  await settle();
+  assert.equal(page.calls.filter(c=>c.path==='/api/connect').at(-1).options.headers.Authorization,`Bearer ${page.token}`);
+  assert.equal(page.get('keyboard').disabled,false);
+  assert.equal(page.calls.some(c=>c.path==='/api/commands'),false);
+});
+test('saved phone reconnects after network failure and stops retrying after revocation',async()=>{
+  const page=browserHarness({saved:true,fail:true});
+  await settle();
+  const retry=[...page.timers.values()].find(t=>t.ms===1000);
+  assert.ok(retry);
+  page.setFailure(false);retry.fn();await settle();
+  assert.equal(page.get('status').textContent,'Connected over Wi-Fi');
+  page.document.hidden=true;page.listeners.visibilitychange();
+  page.setRejected(true);page.document.hidden=false;page.listeners.visibilitychange();await settle();
+  assert.equal(loadConnection(page.storage),null);
+  assert.equal(page.get('entry').hidden,false);
+  assert.equal(page.timers.size,0);
+});

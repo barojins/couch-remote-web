@@ -12,6 +12,7 @@
 		1BF9DBD8C4253C308DDE1467 /* Web in Resources */ = {isa = PBXBuildFile; fileRef = 6C03DAEC6911122019D3E2F5 /* Web */; };
 		2CDAFCEA1247AE8F584AFA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0DC987C9C28A81CE0A151C8B /* Assets.xcassets */; };
 		3418DA6B76EF505303A4D308 /* SoftwareUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8B42714435FD8BDE0077D9 /* SoftwareUpdates.swift */; };
+		5D20EBC2758883EEEDC083D6 /* LoginItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F9078E064ADBC50E902103D /* LoginItem.swift */; };
 		7FCAA06FBDDE6A912CFFFDBF /* RemoteSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70681C8DE6B1B6DD10431C37 /* RemoteSession.swift */; };
 		846A19860FD2EF3A8734AF40 /* CouchRemoteWebApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6AEED6833A5AC52304CEDC /* CouchRemoteWebApp.swift */; };
 		B384279493761D4EC0E58A56 /* RemoteCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FE11476DD27D193B95FFC4 /* RemoteCommand.swift */; };
@@ -23,6 +24,7 @@
 		08B05E513B97DE2535F7E678 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0DC987C9C28A81CE0A151C8B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		13EE188C9084287AE0AE0EBA /* HTTP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTP.swift; sourceTree = "<group>"; };
+		1F9078E064ADBC50E902103D /* LoginItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginItem.swift; sourceTree = "<group>"; };
 		2F611DF8A24F8AE37C9F1770 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		3D6AEED6833A5AC52304CEDC /* CouchRemoteWebApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CouchRemoteWebApp.swift; sourceTree = "<group>"; };
 		6C03DAEC6911122019D3E2F5 /* Web */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Web; sourceTree = SOURCE_ROOT; };
@@ -72,6 +74,7 @@
 				3D6AEED6833A5AC52304CEDC /* CouchRemoteWebApp.swift */,
 				08B05E513B97DE2535F7E678 /* Info.plist */,
 				2F611DF8A24F8AE37C9F1770 /* InputController.swift */,
+				1F9078E064ADBC50E902103D /* LoginItem.swift */,
 				AB8B42714435FD8BDE0077D9 /* SoftwareUpdates.swift */,
 				F016984848509B0F470F477A /* WebHost.swift */,
 			);
@@ -165,6 +168,7 @@
 				846A19860FD2EF3A8734AF40 /* CouchRemoteWebApp.swift in Sources */,
 				046469EA86870B84DC1F917F /* HTTP.swift in Sources */,
 				B4DBA97F2C2C11D29BB5491B /* InputController.swift in Sources */,
+				5D20EBC2758883EEEDC083D6 /* LoginItem.swift in Sources */,
 				B384279493761D4EC0E58A56 /* RemoteCommand.swift in Sources */,
 				7FCAA06FBDDE6A912CFFFDBF /* RemoteSession.swift in Sources */,
 				3418DA6B76EF505303A4D308 /* SoftwareUpdates.swift in Sources */,
@@ -210,7 +214,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -223,7 +227,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -269,7 +273,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -288,7 +292,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

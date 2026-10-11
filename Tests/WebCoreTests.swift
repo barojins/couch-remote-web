@@ -2,8 +2,8 @@ import XCTest
 @testable import CouchWebCore
 
 final class WebCoreTests: XCTestCase {
-    func request(_ path: String, api: RemoteAPI, client: String, body: String = "{}") -> HTTPRequest {
-        HTTPRequest(method: "POST", path: path, headers: ["host": api.authority, "origin": api.origin, "content-type": "application/json", "authorization": "Bearer " + api.session.token, "x-couch-client": client], body: Data(body.utf8))
+    func request(_ path: String, api: RemoteAPI, client: String, body: String = "{}", credential: String? = nil) -> HTTPRequest {
+        HTTPRequest(method: "POST", path: path, headers: ["host": api.authority, "origin": api.origin, "content-type": "application/json", "authorization": "Bearer " + (credential ?? api.session.deviceToken ?? api.session.token), "x-couch-client": client], body: Data(body.utf8))
     }
     func testFragmentedRequestAndPipeline() throws {
         var parser = HTTPParser()
@@ -35,6 +35,7 @@ final class WebCoreTests: XCTestCase {
         req = request("/api/commands", api: api, client: client, body: move)
         XCTAssertEqual(api.handle(req, hasPermission: true) { executed += $0 }.code, 403)
         api.session.approve()
+        req = request("/api/commands", api: api, client: client, body: move)
         XCTAssertEqual(api.handle(req, hasPermission: false) { executed += $0 }.code, 403)
         XCTAssertTrue(executed.isEmpty)
         XCTAssertEqual(api.handle(req, hasPermission: true) { executed += $0 }.code, 200)
@@ -54,11 +55,12 @@ final class WebCoreTests: XCTestCase {
         var api = RemoteAPI(authority: "192.168.1.2:8000")
         let client = UUID().uuidString
         XCTAssertTrue(api.session.connect(client)); api.session.approve()
+        let credential = api.session.deviceToken!
         var executed: [RemoteCommand] = []
         var req = request("/api/commands", api: api, client: client, body: "[{\"type\":\"click\"},{\"type\":\"move\",\"x\":999999,\"y\":0}]")
         XCTAssertEqual(api.handle(req, hasPermission: true) { executed += $0 }.code, 400)
         XCTAssertTrue(executed.isEmpty)
-        req = request("/api/commands", api: api, client: client, body: "[{\"type\":\"text\",\"text\":\"한글 🎬\\nabc\"},{\"type\":\"rightClick\"}]")
+        req = request("/api/commands", api: api, client: client, body: "[{\"type\":\"text\",\"text\":\"한글 🎬\\nabc\"},{\"type\":\"rightClick\"}]", credential: credential)
         XCTAssertEqual(api.handle(req, hasPermission: true) { executed += $0 }.code, 200)
         XCTAssertEqual(executed, [.text("한글 🎬"), .key(.returnKey), .text("abc"), .rightClick])
     }
@@ -126,14 +128,14 @@ final class WebCoreTests: XCTestCase {
         XCTAssertEqual(api.handle(req, hasPermission: true) { _ in }.code, 409)
         XCTAssertTrue(api.session.approved)
     }
-    func testReconnectAlwaysRequiresFreshMacApproval() {
+    func testTrustedReconnectDoesNotRequireFreshMacApproval() {
         var api = RemoteAPI(authority: "192.168.1.2:8000")
         let client = UUID().uuidString
         XCTAssertTrue(api.session.connect(client)); api.session.approve()
         let req = request("/api/connect", api: api, client: client)
         XCTAssertEqual(api.handle(req, hasPermission: true) { _ in }.code, 200)
-        XCTAssertFalse(api.session.approved)
-        XCTAssertNotNil(api.session.code)
+        XCTAssertTrue(api.session.approved)
+        XCTAssertNil(api.session.code)
     }
 
 }
