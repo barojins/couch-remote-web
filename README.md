@@ -54,3 +54,13 @@ bash Scripts/PackageMac.sh
 로컬 Swift 테스트 11개, JavaScript 테스트 4개 통과. macOS 앱 빌드 및 Safari에서 QR 링크의 연결 코드가 Mac과 일치하는 것, 승인 전 입력 차단, 외부 Origin/인증 없는 API의 403 거부를 확인했습니다. 기존 v0.1.1은 사용자가 Ventura에서 동작을 확인했습니다. 이번 홈 화면 실행/재접속과 터치 감각은 실제 iPhone에서 추가 확인해야 하며, Developer ID 공증은 아직 진행하지 않았습니다.
 
 Ventura compatibility update: the Mac deployment target is macOS 13.0, and both Intel and Apple Silicon binaries were rebuilt and checked. The user confirmed v0.1.1 runs on Ventura. This update still needs real iPhone Home Screen testing; the current development Mac runs a newer macOS.
+
+
+### Software updates
+
+From version 1.0.3, use **Check for Updates…** in the Mac window or menu-bar
+menu to download and install future releases without a GitHub login. Install
+this version manually once if your current app has no update button. Both the
+repository and release downloads are now public. Updates retain macOS 13
+Ventura support on Intel and Apple Silicon. See [distribution](Docs/DISTRIBUTION.md)
+for the signed-update publishing process.

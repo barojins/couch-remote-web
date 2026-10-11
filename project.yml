@@ -6,8 +6,12 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: "1.0.2"
-    CURRENT_PROJECT_VERSION: "3"
+    MARKETING_VERSION: "1.0.3"
+    CURRENT_PROJECT_VERSION: "4"
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
 targets:
   CouchRemoteWeb:
     type: application
@@ -18,6 +22,16 @@ targets:
       - path: Web
         type: folder
         buildPhase: resources
+    info:
+      path: MacWeb/Info.plist
+      properties:
+        SUFeedURL: https://raw.githubusercontent.com/barojins/couch-remote-web/main/Updates/appcast.xml
+        SUPublicEDKey: iX0Rmna4vvpNWSSg72vWQFfNgWYkM0LubTEIYmmn/58=
+        SURequireSignedFeed: true
+        SUVerifyUpdateBeforeExtraction: true
+        SUEnableAutomaticChecks: false
+    dependencies:
+      - package: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.couchremote.web.mac

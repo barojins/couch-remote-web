@@ -11,13 +11,16 @@
 		046469EA86870B84DC1F917F /* HTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13EE188C9084287AE0AE0EBA /* HTTP.swift */; };
 		1BF9DBD8C4253C308DDE1467 /* Web in Resources */ = {isa = PBXBuildFile; fileRef = 6C03DAEC6911122019D3E2F5 /* Web */; };
 		2CDAFCEA1247AE8F584AFA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0DC987C9C28A81CE0A151C8B /* Assets.xcassets */; };
+		3418DA6B76EF505303A4D308 /* SoftwareUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8B42714435FD8BDE0077D9 /* SoftwareUpdates.swift */; };
 		7FCAA06FBDDE6A912CFFFDBF /* RemoteSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70681C8DE6B1B6DD10431C37 /* RemoteSession.swift */; };
 		846A19860FD2EF3A8734AF40 /* CouchRemoteWebApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6AEED6833A5AC52304CEDC /* CouchRemoteWebApp.swift */; };
 		B384279493761D4EC0E58A56 /* RemoteCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FE11476DD27D193B95FFC4 /* RemoteCommand.swift */; };
 		B4DBA97F2C2C11D29BB5491B /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F611DF8A24F8AE37C9F1770 /* InputController.swift */; };
+		DC81EF00CC59C2B7391ADF1A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5B7A8B7A10F8940D93D74E89 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		08B05E513B97DE2535F7E678 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0DC987C9C28A81CE0A151C8B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		13EE188C9084287AE0AE0EBA /* HTTP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTP.swift; sourceTree = "<group>"; };
 		2F611DF8A24F8AE37C9F1770 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
@@ -25,9 +28,21 @@
 		6C03DAEC6911122019D3E2F5 /* Web */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Web; sourceTree = SOURCE_ROOT; };
 		70681C8DE6B1B6DD10431C37 /* RemoteSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteSession.swift; sourceTree = "<group>"; };
 		8E819F590897355539F9CF08 /* CouchRemoteWeb.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CouchRemoteWeb.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB8B42714435FD8BDE0077D9 /* SoftwareUpdates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoftwareUpdates.swift; sourceTree = "<group>"; };
 		E3FE11476DD27D193B95FFC4 /* RemoteCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteCommand.swift; sourceTree = "<group>"; };
 		F016984848509B0F470F477A /* WebHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebHost.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C3162204DF5313C56EC61E62 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DC81EF00CC59C2B7391ADF1A /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		0ED5122D8466B7578A6D67F8 /* Core */ = {
@@ -55,7 +70,9 @@
 			children = (
 				0DC987C9C28A81CE0A151C8B /* Assets.xcassets */,
 				3D6AEED6833A5AC52304CEDC /* CouchRemoteWebApp.swift */,
+				08B05E513B97DE2535F7E678 /* Info.plist */,
 				2F611DF8A24F8AE37C9F1770 /* InputController.swift */,
+				AB8B42714435FD8BDE0077D9 /* SoftwareUpdates.swift */,
 				F016984848509B0F470F477A /* WebHost.swift */,
 			);
 			path = MacWeb;
@@ -78,6 +95,7 @@
 			buildPhases = (
 				F3B976007700A0FC75D4F5D1 /* Sources */,
 				22A7115ACE86FDFAC43D9095 /* Resources */,
+				C3162204DF5313C56EC61E62 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -85,6 +103,7 @@
 			);
 			name = CouchRemoteWeb;
 			packageProductDependencies = (
+				5B7A8B7A10F8940D93D74E89 /* Sparkle */,
 			);
 			productName = CouchRemoteWeb;
 			productReference = 8E819F590897355539F9CF08 /* CouchRemoteWeb.app */;
@@ -113,6 +132,9 @@
 			);
 			mainGroup = 5F6520111EF9C592AE381A92;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				669D4CB67F236A8397714795 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A68406C9350AF7801BED94A9 /* Products */;
 			projectDirPath = "";
@@ -145,6 +167,7 @@
 				B4DBA97F2C2C11D29BB5491B /* InputController.swift in Sources */,
 				B384279493761D4EC0E58A56 /* RemoteCommand.swift in Sources */,
 				7FCAA06FBDDE6A912CFFFDBF /* RemoteSession.swift in Sources */,
+				3418DA6B76EF505303A4D308 /* SoftwareUpdates.swift in Sources */,
 				02B95F39D833A3E99C72268B /* WebHost.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -187,7 +210,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -200,7 +223,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -246,7 +269,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -265,7 +288,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -284,6 +307,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MacWeb/Info.plist;
 				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Let your iPhone connect to this Mac over your local Wi-Fi network.";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -302,6 +326,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MacWeb/Info.plist;
 				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Let your iPhone connect to this Mac over your local Wi-Fi network.";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -335,6 +360,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		669D4CB67F236A8397714795 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5B7A8B7A10F8940D93D74E89 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 669D4CB67F236A8397714795 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FC5364AC413063886E4A389C /* Project object */;
 }

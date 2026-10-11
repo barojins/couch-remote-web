@@ -8,6 +8,7 @@ struct CouchRemoteWebApp: App {
         MenuBarExtra("Couch Remote Web", systemImage: "wifi") {
             Text(delegate.host.message)
             Button("Open Couch Remote Web") { delegate.showWindow() }
+            CheckForUpdatesButton(updates: delegate.updates)
             Button("Stop receiver") { delegate.host.stop() }
             Divider()
             Button("Quit") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
@@ -16,6 +17,7 @@ struct CouchRemoteWebApp: App {
 }
 final class WebAppDelegate: NSObject, NSApplicationDelegate {
     let host = WebHost()
+    let updates = SoftwareUpdates()
     private var window: NSWindow?
     func applicationDidFinishLaunching(_ notification: Notification) {
         host.onApproval = { [weak self] in self?.showWindow() }
@@ -28,7 +30,7 @@ final class WebAppDelegate: NSObject, NSApplicationDelegate {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 700), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
             window.title = "Couch Remote Web"
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: WebSetupView(host: host))
+            window.contentView = NSHostingView(rootView: WebSetupView(host: host, updates: updates))
             window.center()
             self.window = window
         }
@@ -38,6 +40,7 @@ final class WebAppDelegate: NSObject, NSApplicationDelegate {
 }
 private struct WebSetupView: View {
     @ObservedObject var host: WebHost
+    @ObservedObject var updates: SoftwareUpdates
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -83,6 +86,11 @@ private struct WebSetupView: View {
                     }
                 }
                 Divider()
+                HStack {
+                    Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    CheckForUpdatesButton(updates: updates)
+                }
                 Label(host.hasPermission ? "Accessibility enabled" : "Accessibility required", systemImage: "hand.raised")
                 if !host.hasPermission { Button("Grant Accessibility access") { host.requestPermission() } }
                 Text("Use only on a trusted private Wi-Fi network. This version uses local HTTP, not HTTPS; do not send passwords or sensitive text. Never forward its port to the internet.")
