@@ -43,7 +43,7 @@ const {runInNewContext}=await import('node:vm');
 const {webcrypto}=await import('node:crypto');
 const appSource=(await readFile(new URL('../Web/app.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
-function browserHarness({saved=false,fail=false,legacy=false}={}) {
+function browserHarness({saved=false,fail=false,legacy=false,commandGate=null}={}) {
   const token='t'.repeat(43), client='01234567-89ab-4def-8123-456789abcdef';
   const values=new Map(), storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
   if(saved)saveConnection(storage,token,client);
@@ -68,6 +68,7 @@ function browserHarness({saved=false,fail=false,legacy=false}={}) {
     addEventListener:(name,fn)=>listeners[name]=fn,
     fetch:async(path,options)=>{
       calls.push({path,options});
+      if(path==='/api/commands' && commandGate)await commandGate();
       if(failure)throw new Error('offline');
       return {ok:!rejected,status:rejected?403:200,json:async()=>rejected?{error:'revoked'}:{state,code:'',...(!saved && path==='/api/status'?{deviceToken:token}:{})}};
     }
@@ -131,4 +132,38 @@ test('modern browsers register only pointer input and retain native keyboard dia
   let opened=false;page.get('keyboardDialog').showModal=()=>opened=true;
   page.get('keyboard').onclick();assert.equal(opened,true);
   assert.equal(page.get('main').hasAttribute('aria-hidden'),false);
+});
+
+test('speed filtering reduces acceleration jitter without delaying position or adding momentum',()=>{
+  const m=new Motion();m.delta(1,0,200,false,1/60);
+  const deltas=[];
+  for(let i=0;i<60;i++)deltas.push(m.delta(10,0,i%2?100:700,false,1/60).x);
+  assert.ok(Math.max(...deltas)-Math.min(...deltas)<=6);
+  assert.equal(m.delta(0,0,0,false,1/60),null);
+  const precise=new Motion();let total=0;
+  for(let i=0;i<100;i++){const d=precise.delta(.125,0,20);if(d)total+=d.x;}
+  assert.ok(Math.abs(total-10)<=1);
+  assert.equal(new Motion().delta(100,0,5000).x,200);
+});
+test('speed filter tracks elapsed time consistently across touch sampling rates',()=>{
+  function atRate(hz){const m=new Motion();m.delta(0,0,100);for(let i=0;i<hz/2;i++)m.delta(1,0,600,false,1/hz);return m.speed;}
+  assert.ok(Math.abs(atRate(30)-atRate(120))<.001);
+  const g=new Gesture();g.down(1,0,0,0);g.move(1,40,0,20);g.up(1,30);
+  g.down(1,0,0,100);const precise=g.move(1,2,0,200);assert.equal(precise.x,1);
+});
+
+test('movement accumulated in flight is sent immediately after response, in order',async()=>{
+  let release;
+  const gate=new Promise(resolve=>release=resolve);
+  const page=browserHarness({saved:true,commandGate:()=>gate});await settle();
+  const handlers=page.get('trackpad').handlers;
+  const event=(x,time)=>({pointerId:1,clientX:x,clientY:0,timeStamp:time,preventDefault(){}});
+  handlers.pointerdown(event(0,0));handlers.pointermove(event(10,16));
+  const frame=[...page.timers.entries()].find(([,t])=>t.ms===16);
+  page.timers.delete(frame[0]);frame[1].fn();await settle();
+  assert.equal(page.calls.filter(c=>c.path==='/api/commands').length,1);
+  handlers.pointermove(event(20,32));
+  release();await settle();
+  assert.equal(page.calls.filter(c=>c.path==='/api/commands').length,2);
+  assert.equal([...page.timers.values()].some(t=>t.ms===16),false);
 });

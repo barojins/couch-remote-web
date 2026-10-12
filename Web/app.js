@@ -78,7 +78,12 @@ async function flush(){
   sending=true; const current=generation; const batch=queue.splice(0,32);
   try{const r=await api('/api/commands',batch);if(current===generation)apply(r);}
   catch(error){if(current===generation)recover(error.message+' Input was not replayed.');}
-  finally{sending=false;if(queue.length)schedule();}
+  finally{
+    sending=false;
+    // A frame already collected these inputs while the request was in flight.
+    // Send them now instead of adding another frame of latency after every RTT.
+    if(ready && queue.length){cancelAnimationFrame(frame);frame=null;flush();}
+  }
 }
 const pad=$('trackpad');
 function down(id,x,y,time) {

@@ -4,10 +4,14 @@ export function coalesce(previous, next) {
   return Math.abs(x) <= 8192 && Math.abs(y) <= 8192 ? {...next, x, y} : null;
 }
 export class Motion {
-  constructor() { this.x = 0; this.y = 0; }
-  delta(x, y, speed, scrolling = false) {
-    const t = Math.min(1, Math.max(0, (speed - 40) / 760));
-    const gain = scrolling ? 1 : .8 + 2.2 * t * t * (3 - 2 * t);
+  constructor() { this.x = 0; this.y = 0; this.speed = null; }
+  delta(x, y, speed, scrolling = false, dt = 1/60) {
+    // Filter speed, not position: stabilize acceleration without adding cursor
+    // lag, momentum after lift-off, or losing tiny fractional movements.
+    const weight = 1 - Math.exp(-Math.max(0, dt) / .04);
+    this.speed = this.speed === null ? speed : this.speed + weight * (speed - this.speed);
+    const t = Math.min(1, Math.max(0, (this.speed - 40) / 760));
+    const gain = scrolling ? 1 : .8 + 1.2 * t * t * (3 - 2 * t);
     this.x += x * gain; this.y += y * gain;
     const dx = Math.trunc(this.x), dy = Math.trunc(this.y);
     this.x -= dx; this.y -= dy;
@@ -31,9 +35,9 @@ export class Gesture {
     const dx = after.x-before.x, dy = after.y-before.y;
     const dt = Math.max(.002, (time-this.lastTime)/1000); this.lastTime = time;
     this.travel += Math.hypot(dx,dy); this.pendingX += dx; this.pendingY += dy;
-    if (!this.moving && this.travel < 3) return null;
+    if (!this.moving && this.travel < 2) return null;
     this.moving = true;
-    const result = this.motion.delta(this.pendingX,this.pendingY,Math.hypot(dx,dy)/dt,this.maxTouches===2);
+    const result = this.motion.delta(this.pendingX,this.pendingY,Math.hypot(dx,dy)/dt,this.maxTouches===2,dt);
     this.pendingX=0; this.pendingY=0; return result;
   }
   up(id,time) {
