@@ -4,15 +4,15 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>CouchRemoteWeb</title>
         <item>
-            <title>1.0.4</title>
-            <pubDate>Sat, 10 Oct 2026 23:51:05 -0700</pubDate>
-            <sparkle:version>5</sparkle:version>
-            <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+            <title>1.0.5</title>
+            <pubDate>Sun, 11 Oct 2026 20:35:21 -0700</pubDate>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>1.0.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/barojins/couch-remote-web/releases/download/v0.1.4/CouchRemoteWeb-macOS13-universal.dmg" length="2981668" type="application/octet-stream" sparkle:edSignature="9ryq4JtV3x2n3yPLDLZtFWZ6k0Fgn1wjXZMM9tG+lWTr/DJKGM9g3eb/vnE0/baA50VKOoy07iPjQOUejR5kCQ=="></enclosure>
+            <enclosure url="https://github.com/barojins/couch-remote-web/releases/download/v0.1.5/CouchRemoteWeb-macOS13-universal.dmg" length="2982196" type="application/octet-stream" sparkle:edSignature="nN+zMTKLJPkjTzhcDCoH/DH/Wt5GjM/X9azOx6gJLW5RXBZPOEnHKCyGOQsSoylErCs14T2mBhxb4ikmMLKmAQ=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: JA0AuqgHqVb0kQE2atmnlQfpU31hSQjY3dfMn2Hk1kVUQpy+gjWdH3tdKk8pFFN5d0FvD4i3+Qi5aIECBxXACg==
+edSignature: hp2tJw4pCtibB34hJ2R2aDLVauJs436DV7RBhPrVDW+R6KJ6WwrQQksN7QU5DSWMuaGKefehhVnbjJU3KpqLBA==
 length: 1073
 -->
