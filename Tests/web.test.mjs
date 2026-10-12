@@ -59,7 +59,7 @@ function browserHarness({saved=false,fail=false,legacy=false,commandGate=null}={
     }
     return elements.get(id);
   };
-  const document={hidden:false,getElementById:get,querySelectorAll:()=>[],addEventListener:(name,fn)=>listeners[name]=fn};
+  const document={hidden:false,getElementById:get,querySelectorAll:selector=>selector==='[data-key]'?['volumeDown','mute','volumeUp'].map(key=>{const b=get(key);b.dataset={key};return b;}):[],addEventListener:(name,fn)=>listeners[name]=fn};
   let state='ready', failure=fail, rejected=false;
   const context={document,location:{hash:saved?'':'#'+'q'.repeat(43),pathname:'/'},history:{replaceState(){}},localStorage:storage,
     ...(legacy?{}:{PointerEvent:function(){}}),crypto:webcrypto,Gesture,coalesce,loadConnection,saveConnection,forgetConnection,retryDelay,AbortController,TextEncoder,
@@ -166,4 +166,16 @@ test('movement accumulated in flight is sent immediately after response, in orde
   release();await settle();
   assert.equal(page.calls.filter(c=>c.path==='/api/commands').length,2);
   assert.equal([...page.timers.values()].some(t=>t.ms===16),false);
+});
+
+test('volume buttons enqueue commands when connected and disable when suspended',async()=>{
+  const page=browserHarness({saved:true,legacy:true});await settle();
+  for(const key of ['volumeDown','mute','volumeUp']) {
+    assert.equal(page.get(key).disabled,false);page.get(key).onclick();
+  }
+  const frame=[...page.timers.entries()].find(([,t])=>t.ms===16);page.timers.delete(frame[0]);frame[1].fn();await settle();
+  const sent=page.calls.filter(c=>c.path==='/api/commands');
+  assert.deepEqual(JSON.parse(sent[0].options.body),['volumeDown','mute','volumeUp'].map(key=>({type:'key',key})));
+  page.document.hidden=true;page.listeners.visibilitychange();
+  for(const key of ['volumeDown','mute','volumeUp'])assert.equal(page.get(key).disabled,true);
 });

@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import IOKit.hidsystem
 
 final class InputController {
     private var postedPosition: CGPoint?
@@ -64,6 +65,22 @@ final class InputController {
             }
             if !units.isEmpty { postText(units) }
         case let .key(key):
+            // Use the same system media events as the Mac's volume keys.
+            // Digital outputs such as HDMI may expose no adjustable volume.
+            let mediaKeys: [RemoteKey: Int32] = [
+                .volumeDown: NX_KEYTYPE_SOUND_DOWN, .mute: NX_KEYTYPE_MUTE,
+                .volumeUp: NX_KEYTYPE_SOUND_UP
+            ]
+            if let mediaKey = mediaKeys[key] {
+                for state in [0xA, 0xB] {
+                    NSEvent.otherEvent(with: .systemDefined, location: .zero,
+                        modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                        windowNumber: 0, context: nil, subtype: 8,
+                        data1: (Int(mediaKey) << 16) | (state << 8), data2: -1)?
+                        .cgEvent?.post(tap: .cghidEventTap)
+                }
+                return
+            }
             let codes: [RemoteKey: CGKeyCode] = [
                 .returnKey: 36, .backspace: 51, .escape: 53, .space: 49,
                 .left: 123, .right: 124, .up: 126, .down: 125, .tab: 48

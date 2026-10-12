@@ -41,6 +41,20 @@ final class WebCoreTests: XCTestCase {
         XCTAssertEqual(api.handle(req, hasPermission: true) { executed += $0 }.code, 200)
         XCTAssertEqual(executed, [.move(2, -3)])
     }
+    func testVolumeKeysRequireApprovalAndUseOrderedCommandBatch() {
+        var api = RemoteAPI(authority: "192.168.1.2:8000")
+        let client = UUID().uuidString
+        let body = "[{\"type\":\"key\",\"key\":\"volumeDown\"},{\"type\":\"key\",\"key\":\"mute\"},{\"type\":\"key\",\"key\":\"volumeUp\"}]"
+        _ = api.handle(request("/api/connect", api: api, client: client), hasPermission: true) { _ in }
+        var executed: [RemoteCommand] = []
+        var req = request("/api/commands", api: api, client: client, body: body)
+        XCTAssertEqual(api.handle(req, hasPermission: true) { executed += $0 }.code, 403)
+        XCTAssertTrue(executed.isEmpty)
+        api.session.approve()
+        req = request("/api/commands", api: api, client: client, body: body)
+        XCTAssertEqual(api.handle(req, hasPermission: true) { executed += $0 }.code, 200)
+        XCTAssertEqual(executed, [.key(.volumeDown), .key(.mute), .key(.volumeUp)])
+    }
     func testWrongTokenOriginAndHostAreRejected() {
         var api = RemoteAPI(authority: "192.168.1.2:8000")
         let base = request("/api/connect", api: api, client: UUID().uuidString)

@@ -45,3 +45,7 @@ dialog:not([open]) { display: none; }
 dialog[open] { display: block; position: fixed; z-index: 10; left: 0; right: 0; bottom: 0; width: 100%; max-width: 560px; max-height: 85vh; max-height: 85svh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px 20px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
 main[aria-hidden="true"] { visibility: hidden; }
 @media (max-height: 480px) { main > * + * { margin-top: 8px; } main { padding-top: 10px; padding-bottom: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); } }
+
+#volume { display: grid; grid-template-columns: repeat(3, 1fr); grid-gap: 10px; flex-shrink: 0; }
+#volume button { display: flex; align-items: center; justify-content: center; }
+#volume svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
