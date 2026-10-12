@@ -14,7 +14,7 @@
 </head>
 <body>
   <main id="main">
-    <header><h1>Couch Remote</h1><button id="keyboard" disabled><span aria-hidden="true">⌨</span> Keyboard</button></header>
+    <header><div class="tools"><button id="help" class="icon" aria-label="Help" title="Help">?</button><button id="settings" class="icon" aria-label="Movement settings" title="Movement settings">⚙</button></div><button id="keyboard" disabled><span aria-hidden="true">⌨</span> Keyboard</button></header>
     <div id="volume" role="group" aria-label="Mac volume">
       <button data-key="volumeDown" aria-label="Volume down" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M16 12h6"/></svg></button>
       <button data-key="mute" aria-label="Mute or unmute" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="m16 9 6 6m0-6-6 6"/></svg></button>
@@ -24,10 +24,29 @@
       <label for="entryCode">Mac connection code</label>
       <div class="entry-row"><input id="entryCode" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{8}" maxlength="8" placeholder="8 digits" required><button id="pairButton" type="submit">Connect</button></div>
     </form>
-    <section id="pairing" hidden><div id="code"></div><p>Compare this code and allow control on your Mac.</p></section>
+    <section id="pairing" hidden><div id="code"></div><p>Awaiting approval</p></section>
     <div id="trackpad" role="application" aria-label="Mac trackpad: slide to move, tap to click, two-finger tap to right-click, two fingers to scroll" tabindex="0"></div>
     <footer><button id="connect" hidden>Reconnect</button><p id="status" role="status">Connecting…</p></footer>
   </main>
+  <dialog id="settingsDialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="dialog-heading"><h2 id="settingsTitle">Movement</h2><button id="settingsDone" class="quiet">Done</button></div>
+    <label class="tuning" for="sensitivity">Pointer speed <output id="sensitivityValue"></output></label>
+    <input id="sensitivity" type="range" min="0.25" max="2" step="0.05">
+    <label class="tuning" for="acceleration">Acceleration <output id="accelerationValue"></output></label>
+    <input id="acceleration" type="range" min="0" max="2" step="0.1">
+    <label class="tuning" for="smoothing">Smoothing <output id="smoothingValue"></output></label>
+    <input id="smoothing" type="range" min="0" max="100" step="5">
+    <details><summary>About these settings</summary><p>Speed changes travel distance. Acceleration adds speed to fast swipes; set it to zero for a consistent ratio. Smoothing steadies acceleration changes without adding glide after lifting your finger. Settings are saved on this phone.</p></details>
+    <button id="resetMovement" class="quiet">Reset to default</button><p id="settingsStatus" role="status"></p>
+  </dialog>
+  <dialog id="helpDialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="dialog-heading"><h2 id="helpTitle">Help</h2><button id="helpDone" class="quiet">Done</button></div>
+    <details><summary>Connect</summary><p>Keep the Mac awake and both devices on the same private Wi-Fi. Scan the Mac’s QR code or enter its 8-digit connection code. Compare the approval codes, then choose Trust this phone on the Mac.</p></details>
+    <details><summary>Trackpad and keyboard</summary><p>Slide to move, tap to click, double-tap to double-click. Tap with two fingers to right-click, or slide two fingers to scroll. For typing, select a text field on the Mac, then open Keyboard.</p></details>
+    <details><summary>Use without Safari’s toolbar</summary><p>In Safari, choose Share → Add to Home Screen. Open that icon and approve it once on the Mac.</p></details>
+    <details><summary>Volume</summary><p>These buttons control the Mac’s volume keys. HDMI audio may require the TV’s own volume controls.</p></details>
+    <details><summary>Privacy</summary><p>This remote uses local HTTP. Use trusted private Wi-Fi only; avoid sending passwords or sensitive text and never forward the receiver port to the internet.</p></details>
+  </dialog>
   <dialog id="keyboardDialog" role="dialog" aria-modal="true" aria-labelledby="keyboardTitle">
     <div class="dialog-heading"><h2 id="keyboardTitle">Keyboard</h2><button id="done" class="quiet">Done</button></div>
     <form id="composer"><textarea id="text" rows="1" placeholder="Type…" aria-label="Text to send" maxlength="4096"></textarea><button id="send" aria-label="Send text" disabled>↑</button></form>

@@ -1,4 +1,4 @@
-import {Gesture, coalesce} from './gesture.js';
+import {Gesture, coalesce, movementDefaults, loadMovement, saveMovement} from './gesture.js';
 import {loadConnection, saveConnection, forgetConnection, retryDelay} from './connection.js';
 const $ = id => document.getElementById(id);
 let storage; try { storage=localStorage; } catch {}
@@ -12,7 +12,8 @@ const hex = [...random].map(x=>x.toString(16).padStart(2,'0')).join('');
 const client = (saved && saved.client) || `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 let ready=false, active=false, queue=[], sending=false, polling=null, frame=null, tapTimer=null, lastTap=0, textBusy=false, generation=0;
 let retryTimer=null, attempts=0, connecting=false;
-const gesture = new Gesture();
+let tuning=loadMovement(storage);
+const gesture = new Gesture(tuning);
 function setMessage(text) { $('status').textContent=text; $('keyboardStatus').textContent=text; }
 function controls() {
   $('trackpad').classList.toggle('ready',ready); $('keyboard').disabled=!ready;
@@ -119,29 +120,47 @@ if(typeof PointerEvent!=='undefined') {
 }
 pad.addEventListener('contextmenu',e=>e.preventDefault());
 pad.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();enqueue({type:e.shiftKey?'rightClick':'click'});}});
-const keyboardDialog=$('keyboardDialog');
-function closeKeyboard(){
-  if(typeof keyboardDialog.close==='function')keyboardDialog.close();
-  else {keyboardDialog.removeAttribute('open');$('main').removeAttribute('aria-hidden');}
-  $('keyboard').focus();
-}
-$('keyboard').onclick=()=>{
-  cancelGesture();
-  if(typeof keyboardDialog.showModal==='function')keyboardDialog.showModal();
-  else {keyboardDialog.setAttribute('open','');$('main').setAttribute('aria-hidden','true');}
-  $('text').focus();
-};
-$('done').onclick=closeKeyboard;
-keyboardDialog.addEventListener('keydown',e=>{
-  if(typeof keyboardDialog.showModal==='function')return;
-  if(e.key==='Escape' && !textBusy){e.preventDefault();closeKeyboard();}
-  if(e.key==='Tab'){
-    const items=Array.from(keyboardDialog.querySelectorAll('button, textarea')).filter(el=>!el.disabled);
-    const first=items[0],last=items[items.length-1];
-    if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
-    else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+function bindDialog(dialogID,openID,closeID,focusID) {
+  const dialog=$(dialogID);
+  function close(){
+    if(typeof dialog.close==='function')dialog.close();
+    else {dialog.removeAttribute('open');$('main').removeAttribute('aria-hidden');}
+    $(openID).focus();
   }
-});
+  $(openID).onclick=()=>{
+    cancelGesture();
+    if(typeof dialog.showModal==='function')dialog.showModal();
+    else {dialog.setAttribute('open','');$('main').setAttribute('aria-hidden','true');}
+    $(focusID).focus();
+  };
+  $(closeID).onclick=close;
+  dialog.addEventListener('keydown',e=>{
+    if(typeof dialog.showModal==='function')return;
+    if(e.key==='Escape' && !textBusy){e.preventDefault();close();}
+    if(e.key==='Tab'){
+      const items=Array.from(dialog.querySelectorAll('button, textarea, input, summary')).filter(el=>!el.disabled);
+      const first=items[0],last=items[items.length-1];
+      if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+    }
+  });
+}
+bindDialog('keyboardDialog','keyboard','done','text');
+bindDialog('settingsDialog','settings','settingsDone','sensitivity');
+bindDialog('helpDialog','help','helpDone','helpDone');
+function showTuning(){
+  ['sensitivity','acceleration','smoothing'].forEach(key=>{
+    $(key).value=tuning[key];
+    $(key+'Value').textContent=key==='smoothing'?tuning[key]+' ms':tuning[key].toFixed(2)+'×';
+  });
+}
+function updateTuning(){
+  cancelGesture();gesture.configure(tuning);showTuning();
+  $('settingsStatus').textContent=saveMovement(storage,tuning)?'':'Applies now; browser storage is unavailable.';
+}
+['sensitivity','acceleration','smoothing'].forEach(key=>$(key).oninput=()=>{tuning[key]=Number($(key).value);updateTuning();});
+$('resetMovement').onclick=()=>{tuning=Object.assign({},movementDefaults);updateTuning();};
+showTuning();
 $('keyboardDialog').addEventListener('cancel',e=>{if(textBusy)e.preventDefault();});
 $('text').oninput=()=>{$('text').style.height='auto';$('text').style.height=Math.min(160,$('text').scrollHeight)+'px';controls();};
 document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>enqueue({type:'key',key:b.dataset.key}));

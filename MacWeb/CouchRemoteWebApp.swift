@@ -41,10 +41,24 @@ final class WebAppDelegate: NSObject, NSApplicationDelegate {
 private struct WebSetupView: View {
     @ObservedObject var host: WebHost
     @ObservedObject var updates: SoftwareUpdates
+    @State private var showingHelp = false
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Label("Couch Remote Web", systemImage: "wifi").font(.largeTitle.bold())
+                HStack {
+                    Spacer()
+                    Button { showingHelp.toggle() } label: { Image(systemName: "questionmark.circle") }
+                        .help("Connection and setup instructions")
+                        .popover(isPresented: $showingHelp) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Connect your phone").font(.headline)
+                                Text("Keep both devices on the same private Wi-Fi. Scan the QR code in Safari, compare the approval codes, then choose Trust this phone.")
+                                Text("For a full-screen remote, use Safari → Share → Add to Home Screen. Open that icon, enter the connection code once, and approve it. Future launches reconnect automatically.")
+                                Text("Enable Accessibility to control the Mac. Launch at login starts the receiver when you sign in.")
+                                Text("This remote uses local HTTP. Use trusted private Wi-Fi only, avoid passwords or sensitive text, and never forward its port to the internet.")
+                            }.font(.callout).padding(20).frame(width: 330)
+                        }
+                }
                 Text(host.message).foregroundStyle(.secondary)
                 if host.isRunning {
                     if let code = host.approvalCode {
@@ -58,10 +72,8 @@ private struct WebSetupView: View {
                             Image(nsImage: image).interpolation(.none).resizable().scaledToFit()
                                 .frame(width: 170, height: 170).padding(12).background(.white)
                         }
-                        Text("Scan to connect in Safari.").font(.callout)
-                        Text("First-time connection code").font(.caption).foregroundStyle(.secondary)
+                        Text("Connection code").font(.caption).foregroundStyle(.secondary)
                         Text(host.entryCode).font(.system(size: 26, weight: .medium, design: .monospaced)).textSelection(.enabled)
-                        Text("Safari → Share → Add to Home Screen → Open as Web App. Add to Home Screen before approving. Open that icon, enter this code once, then trust the phone. Future launches reconnect automatically.").font(.caption).foregroundStyle(.secondary)
                         HStack {
                             Text(host.url.components(separatedBy: "#")[0]).font(.caption.monospaced())
                             Button("Copy link") {
@@ -104,8 +116,6 @@ private struct WebSetupView: View {
                 }
                 Label(host.hasPermission ? "Accessibility enabled" : "Accessibility required", systemImage: "hand.raised")
                 if !host.hasPermission { Button("Grant Accessibility access") { host.requestPermission() } }
-                Text("Use only on a trusted private Wi-Fi network. This version uses local HTTP, not HTTPS; do not send passwords or sensitive text. Never forward its port to the internet.")
-                    .font(.caption).foregroundStyle(.secondary)
             }.padding(28)
         }.frame(width: 440, height: 700)
     }

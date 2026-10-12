@@ -49,3 +49,13 @@ main[aria-hidden="true"] { visibility: hidden; }
 #volume { display: grid; grid-template-columns: repeat(3, 1fr); grid-gap: 10px; flex-shrink: 0; }
 #volume button { display: flex; align-items: center; justify-content: center; }
 #volume svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+.tools { display: flex; }
+.tools > * + * { margin-left: 8px; }
+.icon { width: 44px; padding: 8px; }
+.tuning { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; }
+.tuning output { color: var(--accent); font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; min-height: 44px; margin: 0; accent-color: var(--accent); }
+details { margin-top: 14px; }
+summary { min-height: 44px; padding: 10px 0; }
+#settingsStatus { font-size: 12px; }

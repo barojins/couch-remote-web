@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Gesture, Motion, coalesce} from '../Web/gesture.js';
+import {Gesture, Motion, coalesce, movementDefaults, movementSettings, loadMovement, saveMovement} from '../Web/gesture.js';
 test('single tap and two-finger tap remain separate',()=>{
   const g=new Gesture(); g.down(1,10,10,0); assert.equal(g.up(1,100),'click');
   g.down(1,10,10,200);g.down(2,30,10,210);assert.equal(g.up(1,240),null);assert.equal(g.up(2,250),'rightClick');
@@ -62,7 +62,7 @@ function browserHarness({saved=false,fail=false,legacy=false,commandGate=null}={
   const document={hidden:false,getElementById:get,querySelectorAll:selector=>selector==='[data-key]'?['volumeDown','mute','volumeUp'].map(key=>{const b=get(key);b.dataset={key};return b;}):[],addEventListener:(name,fn)=>listeners[name]=fn};
   let state='ready', failure=fail, rejected=false;
   const context={document,location:{hash:saved?'':'#'+'q'.repeat(43),pathname:'/'},history:{replaceState(){}},localStorage:storage,
-    ...(legacy?{}:{PointerEvent:function(){}}),crypto:webcrypto,Gesture,coalesce,loadConnection,saveConnection,forgetConnection,retryDelay,AbortController,TextEncoder,
+    ...(legacy?{}:{PointerEvent:function(){}}),crypto:webcrypto,Gesture,coalesce,movementDefaults,loadMovement,saveMovement,loadConnection,saveConnection,forgetConnection,retryDelay,AbortController,TextEncoder,
     setTimeout:(fn,ms)=>{const id=++timerID;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),
     requestAnimationFrame:fn=>{const id=++timerID;timers.set(id,{fn,ms:16});return id;},cancelAnimationFrame:id=>timers.delete(id),
     addEventListener:(name,fn)=>listeners[name]=fn,
@@ -178,4 +178,28 @@ test('volume buttons enqueue commands when connected and disable when suspended'
   assert.deepEqual(JSON.parse(sent[0].options.body),['volumeDown','mute','volumeUp'].map(key=>({type:'key',key})));
   page.document.hidden=true;page.listeners.visibilitychange();
   for(const key of ['volumeDown','mute','volumeUp'])assert.equal(page.get(key).disabled,true);
+});
+
+test('movement settings clamp invalid values, persist, and preserve defaults',()=>{
+  assert.deepEqual(movementSettings({sensitivity:20,acceleration:-1,smoothing:'x'}),{sensitivity:2,acceleration:0,smoothing:40});
+  assert.deepEqual(loadMovement(undefined),movementDefaults);
+  assert.equal(saveMovement(undefined,movementDefaults),false);
+  let stored;const storage={getItem:()=>stored,setItem:(key,value)=>stored=value};
+  const settings={sensitivity:.5,acceleration:0,smoothing:0};
+  assert.equal(saveMovement(storage,settings),true);assert.deepEqual(loadMovement(storage),settings);
+  assert.equal(new Motion(settings).delta(10,0,5000).x,4);
+  assert.equal(new Motion(settings).delta(10,0,10).x,4);
+  const gesture=new Gesture(settings);gesture.down(1,0,0,0);gesture.up(1,100);
+  gesture.down(1,0,0,200);assert.equal(gesture.move(1,10,0,220).x,4);
+});
+test('legacy settings and help open and close; tuning saves and resets',async()=>{
+  const page=browserHarness({saved:true,legacy:true});await settle();
+  page.get('settings').onclick();assert.equal(page.get('settingsDialog').hasAttribute('open'),true);
+  page.get('sensitivity').value='0.5';page.get('sensitivity').oninput();
+  assert.equal(loadMovement(page.storage).sensitivity,.5);
+  assert.equal(page.get('sensitivityValue').textContent,'0.50×');
+  page.get('resetMovement').onclick();assert.deepEqual(loadMovement(page.storage),movementDefaults);
+  page.get('settingsDone').onclick();assert.equal(page.get('main').hasAttribute('aria-hidden'),false);
+  page.get('help').onclick();assert.equal(page.get('helpDialog').hasAttribute('open'),true);
+  page.get('helpDone').onclick();assert.equal(page.get('helpDialog').hasAttribute('open'),false);
 });
