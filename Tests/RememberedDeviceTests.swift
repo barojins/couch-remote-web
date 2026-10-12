@@ -2,6 +2,32 @@ import XCTest
 @testable import CouchWebCore
 
 final class RememberedDeviceTests: XCTestCase {
+    func testNamesMigratePersistAndFollowConnectionLifecycle() throws {
+        let id = UUID()
+        let legacy = "[{\"id\":\"\(id.uuidString)\",\"credentialHash\":\"hash\"}]"
+        let old = try JSONDecoder().decode([TrustedWebDevice].self, from: Data(legacy.utf8))
+        XCTAssertEqual(old[0].displayName, "Phone")
+        var session = RemoteSession()
+        XCTAssertTrue(session.connect(UUID().uuidString, name: "iPhone 5s"))
+        session.approve()
+        let device = try XCTUnwrap(session.trustedDevices.first)
+        XCTAssertEqual(device.displayName, "iPhone 5s")
+        XCTAssertEqual(session.activeDeviceID, device.id)
+        let token = try XCTUnwrap(session.deviceToken)
+        session.renameDevice(device.id, name: " Living room phone ")
+        let restored = try JSONDecoder().decode([TrustedWebDevice].self, from: JSONEncoder().encode(session.trustedDevices))
+        XCTAssertEqual(restored[0].displayName, "Living room phone")
+        session.disconnect()
+        XCTAssertNil(session.activeDeviceID)
+        XCTAssertTrue(session.reconnectTrusted(UUID().uuidString, authorization: "Bearer " + token))
+        XCTAssertEqual(session.activeDeviceID, device.id)
+        XCTAssertEqual(session.trustedDevices[0].displayName, "Living room phone")
+        session.forgetDevice(device.id)
+        XCTAssertNil(session.activeDeviceID)
+        XCTAssertTrue(session.trustedDevices.isEmpty)
+        XCTAssertEqual(TrustedWebDevice.cleanName("\n\t"), "Phone")
+        XCTAssertEqual(TrustedWebDevice.cleanName(String(repeating: "a", count: 50)).count, 40)
+    }
     func request(_ path: String, api: RemoteAPI, client: String, credential: String, body: String = "{}") -> HTTPRequest {
         HTTPRequest(method: "POST", path: path, headers: ["host": api.authority, "origin": api.origin, "content-type": "application/json", "authorization": "Bearer " + credential, "x-couch-client": client], body: Data(body.utf8))
     }

@@ -42,6 +42,8 @@ private struct WebSetupView: View {
     @ObservedObject var host: WebHost
     @ObservedObject var updates: SoftwareUpdates
     @State private var showingHelp = false
+    @State private var renamingDevice: UUID?
+    @State private var deviceName = ""
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -62,6 +64,7 @@ private struct WebSetupView: View {
                 Text(host.message).foregroundStyle(.secondary)
                 if host.isRunning {
                     if let code = host.approvalCode {
+                        Text(host.pendingDeviceName).font(.headline)
                         Text(code).font(.system(size: 36, weight: .semibold, design: .monospaced))
                         HStack {
                             Button("Decline") { host.disconnect() }
@@ -99,11 +102,16 @@ private struct WebSetupView: View {
                 }
                 LoginItemView()
                 if !host.trustedDevices.isEmpty {
-                    Text("Trusted phones").font(.headline)
+                    Text("Connected devices").font(.headline)
                     ForEach(host.trustedDevices) { device in
                         HStack {
-                            Text("Phone · \(device.id.uuidString.prefix(8))").font(.caption)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(device.displayName).lineLimit(2)
+                                Text(host.connectedDeviceID == device.id ? "Connected" : "Offline")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             Spacer()
+                            Button("Rename") { deviceName = device.displayName; renamingDevice = device.id }
                             Button("Forget") { host.forgetDevice(device.id) }
                         }
                     }
@@ -118,6 +126,21 @@ private struct WebSetupView: View {
                 if !host.hasPermission { Button("Grant Accessibility access") { host.requestPermission() } }
             }.padding(28)
         }.frame(width: 440, height: 700)
+        .sheet(isPresented: Binding(get: { renamingDevice != nil }, set: { if !$0 { renamingDevice = nil } })) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Device name").font(.headline)
+                TextField("e.g. iPhone 5s", text: $deviceName)
+                HStack {
+                    Button("Cancel") { renamingDevice = nil }.keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button("Save") {
+                        if let id = renamingDevice { host.renameDevice(id, name: deviceName) }
+                        renamingDevice = nil
+                    }.keyboardShortcut(.defaultAction)
+                        .disabled(deviceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }.padding(24).frame(width: 320)
+        }
     }
     private func qrCode(_ text: String) -> NSImage? {
         let filter = CIFilter.qrCodeGenerator()

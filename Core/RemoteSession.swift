@@ -4,12 +4,24 @@ import CryptoKit
 struct TrustedWebDevice: Codable, Identifiable {
     let id: UUID
     let credentialHash: String
+    var name: String? = nil
+    var displayName: String { Self.cleanName(name) }
+    static func cleanName(_ value: String?) -> String {
+        let cleaned = String((value ?? "").unicodeScalars.filter { !$0.properties.isDefaultIgnorableCodePoint && $0.properties.generalCategory != .control }.map(String.init).joined().trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
+        return cleaned.isEmpty ? "Phone" : cleaned
+    }
 }
 
 struct RemoteSession {
     var trustedDevices: [TrustedWebDevice] = []
     private(set) var deviceToken: String?
-    private var activeDeviceID: UUID?
+    private(set) var activeDeviceID: UUID?
+    private(set) var pendingDeviceName = "Phone"
+    mutating func renameDevice(_ id: UUID, name: String) {
+        guard let index = trustedDevices.firstIndex(where: { $0.id == id }) else { return }
+        trustedDevices[index].name = TrustedWebDevice.cleanName(name)
+    }
+
 
     private static func digest(_ value: String) -> String {
         SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -58,7 +70,7 @@ struct RemoteSession {
     }
     private static func newEntryCode() -> String { String(format: "%08d", Int.random(in: 0...99999999)) }
     // A Home Screen launch has no token. Limit code guesses across all clients.
-    mutating func redeemEntryCode(_ value: String, client id: String, now: Date = Date()) -> Int {
+    mutating func redeemEntryCode(_ value: String, client id: String, name: String? = nil, now: Date = Date()) -> Int {
         if now.timeIntervalSince(entryWindow) >= 60 { entryWindow = now; entryAttempts = 0 }
         guard entryAttempts < 5 else { return 429 }
         entryAttempts += 1
@@ -67,7 +79,7 @@ struct RemoteSession {
         // Moving from Safari to a fresh Home Screen app may leave an unapproved
         // QR session behind. A correct Mac entry code can replace that request.
         if !approved { disconnect() }
-        guard client == nil, connect(id, now: now) else { return 409 }
+        guard client == nil, connect(id, name: name, now: now) else { return 409 }
         entryCode = Self.newEntryCode()
         return 200
     }
@@ -78,11 +90,12 @@ struct RemoteSession {
         guard expected.count == actual.count else { return false }
         return zip(expected, actual).reduce(UInt8(0)) { $0 | ($1.0 ^ $1.1) } == 0
     }
-    mutating func connect(_ id: String, now: Date = Date()) -> Bool {
+    mutating func connect(_ id: String, name: String? = nil, now: Date = Date()) -> Bool {
         expire(now: now)
         guard UUID(uuidString: id) != nil else { return false }
         if let client { return client == id }
         client = id
+        pendingDeviceName = TrustedWebDevice.cleanName(name)
         code = String(format: "%06d", Int.random(in: 0...999999))
         approved = false
         lastSeen = now
@@ -99,7 +112,7 @@ struct RemoteSession {
         expire(now: now)
         guard client != nil, code != nil else { return }
         let credential = Self.newToken()
-        let device = TrustedWebDevice(id: UUID(), credentialHash: Self.digest(credential))
+        let device = TrustedWebDevice(id: UUID(), credentialHash: Self.digest(credential), name: pendingDeviceName)
         trustedDevices.append(device)
         activeDeviceID = device.id
         deviceToken = credential
@@ -134,9 +147,9 @@ struct RemoteAPI {
               request.headers["content-type"]?.lowercased().hasPrefix("application/json") == true else { return HTTPResponse(403, json: ["error": "Connection not authorized."]) }
         guard let id = request.headers["x-couch-client"], UUID(uuidString: id) != nil else { return HTTPResponse(400, json: ["error": "Invalid client."]) }
         if request.path == "/api/pair" {
-            struct Pair: Decodable { let code: String }
+            struct Pair: Decodable { let code: String; let deviceName: String? }
             guard let pair = try? JSONDecoder().decode(Pair.self, from: request.body) else { return HTTPResponse(400, json: ["error": "Enter the code shown on your Mac."]) }
-            let result = session.redeemEntryCode(pair.code, client: id)
+            let result = session.redeemEntryCode(pair.code, client: id, name: pair.deviceName)
             guard result == 200 else {
                 return HTTPResponse(result, json: ["error": result == 429 ? "Too many attempts. Wait one minute and try again." : result == 409 ? "Another phone is connected. Disconnect it on the Mac." : "That code is incorrect or expired. Check your Mac."])
             }
@@ -157,7 +170,9 @@ struct RemoteAPI {
                 }
             } else {
                 if session.client == id { session.disconnect() }
-                guard session.connect(id) else { return HTTPResponse(409, json: ["error": "Another phone is connected. Waiting to reconnect…"]) }
+                struct Connect: Decodable { let deviceName: String? }
+                let name = (try? JSONDecoder().decode(Connect.self, from: request.body))?.deviceName
+                guard session.connect(id, name: name) else { return HTTPResponse(409, json: ["error": "Another phone is connected. Waiting to reconnect…"]) }
             }
         } else if !session.touch(id) { return HTTPResponse(401, json: ["error": "Connection expired. Scan the Mac's QR code again."]) }
         if session.isTrusted(request.headers["authorization"]), !session.authorizesActiveDevice(request.headers["authorization"]) {

@@ -3,6 +3,8 @@ import {loadConnection, saveConnection, forgetConnection, retryDelay} from './co
 const $ = id => document.getElementById(id);
 let storage; try { storage=localStorage; } catch {}
 const saved=loadConnection(storage);
+let deviceName=""; try { deviceName=storage.getItem("couch-remote-name") || ""; } catch {}
+let needsName=!saved && !deviceName;
 let token = (saved && saved.token) || location.hash.slice(1);
 history.replaceState(null, '', location.pathname);
 // Persist only a credential issued after explicit Mac approval, never the QR token.
@@ -59,10 +61,11 @@ async function poll() {
   polling=setTimeout(poll,2000);
 }
 async function connect() {
+  if(needsName){stop("Name this device to continue.");$("deviceSetup").hidden=false;$("entry").hidden=true;$("connect").hidden=true;return;}
   if(document.hidden || connecting || active)return;
   if(!token) {stop('Enter the connection code shown on your Mac.');return;}
   stop('Connecting…'); connecting=true; const current=generation; $('connect').hidden=true;
-  try {const r=await api('/api/connect'); if(current!==generation)return; connecting=false; active=true; apply(r); poll();}
+  try {const r=await api('/api/connect',{deviceName}); if(current!==generation)return; connecting=false; active=true; apply(r); poll();}
   catch(error){if(current===generation){if(error.status===403){token='';forgetConnection(storage);stop('Approve this phone again using the code on your Mac.');}else recover(error.message);}}
 }
 function enqueue(command) {
@@ -179,13 +182,19 @@ function suspend(){
   // expires the live session, while the approved device credential remains valid.
   stop('Ready to reconnect when you return.');
 }
+$('deviceSetup').onsubmit=e=>{
+  e.preventDefault();deviceName=$('deviceName').value.trim().slice(0,40);
+  if(!deviceName)return;
+  try {storage.setItem('couch-remote-name',deviceName);} catch {}
+  needsName=false;$('deviceSetup').hidden=true;connect();
+};
 $('connect').onclick=connect;
 $('entry').onsubmit=async e=>{
   e.preventDefault(); const code=$('entryCode').value.trim();
   if(!/^[0-9]{8}$/.test(code)){setMessage('Enter the 8-digit code shown on your Mac.');return;}
   stop('Connecting…'); const current=generation; $('pairButton').disabled=true;
   try {
-    const result=await api('/api/pair',{code});
+    const result=await api('/api/pair',{code,deviceName});
     if(current!==generation)return;
     token=result.token; $('entryCode').value=''; active=true; apply(result); poll();
   } catch(error){if(current===generation)stop(error.message);}

@@ -59,3 +59,7 @@ input[type="range"] { width: 100%; min-height: 44px; margin: 0; accent-color: va
 details { margin-top: 14px; }
 summary { min-height: 44px; padding: 10px 0; }
 #settingsStatus { font-size: 12px; }
+
+#deviceSetup { flex-shrink: 0; padding: 14px; background: #ffffff08; border-radius: 16px; }
+#deviceSetup label { display: block; margin-bottom: 10px; font-size: 14px; }
+#deviceName { min-width: 0; width: 100%; font: inherit; color: inherit; background: #ffffff08; border: 1px solid #ffffff20; border-radius: 10px; padding: 10px; }

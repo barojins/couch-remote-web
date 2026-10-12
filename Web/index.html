@@ -20,6 +20,10 @@
       <button data-key="mute" aria-label="Mute or unmute" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="m16 9 6 6m0-6-6 6"/></svg></button>
       <button data-key="volumeUp" aria-label="Volume up" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M16 12h6m-3-3v6"/></svg></button>
     </div>
+    <form id="deviceSetup" hidden>
+      <label for="deviceName">Device name</label>
+      <div class="entry-row"><input id="deviceName" type="text" maxlength="40" placeholder="e.g. iPhone 5s" autocomplete="off" required><button type="submit">Continue</button></div>
+    </form>
     <form id="entry" hidden>
       <label for="entryCode">Mac connection code</label>
       <div class="entry-row"><input id="entryCode" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{8}" maxlength="8" placeholder="8 digits" required><button id="pairButton" type="submit">Connect</button></div>

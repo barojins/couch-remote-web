@@ -68,3 +68,7 @@ this version manually once if your current app has no update button. Both the
 repository and release downloads are now public. Updates retain macOS 13
 Ventura support on Intel and Apple Silicon. See [distribution](Docs/DISTRIBUTION.md)
 for the signed-update publishing process.
+
+## Device names
+
+New Phone remotes ask for a device name before pairing. The Mac receiver shows saved devices under **Connected devices**, with **Connected / Offline**, **Rename**, and **Forget** controls. Existing approvals remain valid; unnamed devices display as **Phone** until renamed. Offline status appears when the live session expires (up to 30 seconds after the last request). Names are labels only and do not replace pairing-code verification.

@@ -12,6 +12,8 @@ final class WebHost: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var isApproved = false
     @Published private(set) var trustedDevices: [TrustedWebDevice] = []
+    @Published private(set) var connectedDeviceID: UUID?
+    @Published private(set) var pendingDeviceName = "Phone"
     @Published var address = ""
     @Published private(set) var addresses: [String] = []
     var onApproval: (() -> Void)?
@@ -107,6 +109,7 @@ final class WebHost: ObservableObject {
         publish()
     }
     func approve() { api.session.approve(); saveTrust(); publish() }
+    func renameDevice(_ id: UUID, name: String) { api.session.renameDevice(id, name: name); saveTrust(); publish() }
     func forgetDevice(_ id: UUID) {
         api.session.forgetDevice(id)
         saveTrust()
@@ -127,6 +130,8 @@ final class WebHost: ObservableObject {
         approvalCode = api.session.code
         entryCode = api.session.entryCode
         isApproved = api.session.approved
+        connectedDeviceID = api.session.activeDeviceID
+        pendingDeviceName = api.session.pendingDeviceName
         message = !isRunning ? "Receiver stopped" : approvalCode != nil ? "Compare the code on your iPhone before allowing control." : isApproved ? "iPhone connected" : trustedDevices.isEmpty ? "Scan the QR code with your iPhone." : "Ready for your trusted phone. Open Couch Remote on your iPhone."
     }
     private func accept(_ connection: NWConnection) {

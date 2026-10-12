@@ -43,10 +43,11 @@ const {runInNewContext}=await import('node:vm');
 const {webcrypto}=await import('node:crypto');
 const appSource=(await readFile(new URL('../Web/app.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
-function browserHarness({saved=false,fail=false,legacy=false,commandGate=null}={}) {
+function browserHarness({saved=false,fail=false,legacy=false,commandGate=null,unnamed=false}={}) {
   const token='t'.repeat(43), client='01234567-89ab-4def-8123-456789abcdef';
   const values=new Map(), storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
   if(saved)saveConnection(storage,token,client);
+  if(!unnamed)storage.setItem("couch-remote-name","Test phone");
   const elements=new Map(), listeners={}, timers=new Map(), calls=[];
   let timerID=0;
   const get=id=>{
@@ -202,4 +203,14 @@ test('legacy settings and help open and close; tuning saves and resets',async()=
   page.get('settingsDone').onclick();assert.equal(page.get('main').hasAttribute('aria-hidden'),false);
   page.get('help').onclick();assert.equal(page.get('helpDialog').hasAttribute('open'),true);
   page.get('helpDone').onclick();assert.equal(page.get('helpDialog').hasAttribute('open'),false);
+});
+
+test('first pairing asks for a name before connecting and sends it to the Mac',async()=>{
+  const page=browserHarness({unnamed:true});await settle();
+  assert.equal(page.calls.length,0);
+  assert.equal(page.get('deviceSetup').hidden,false);
+  page.get('deviceName').value='iPhone 5s';page.get('deviceSetup').onsubmit({preventDefault(){}});await settle();
+  assert.equal(page.get('deviceSetup').hidden,true);
+  assert.equal(JSON.parse(page.calls[0].options.body).deviceName,'iPhone 5s');
+  assert.equal(page.storage.getItem('couch-remote-name'),'iPhone 5s');
 });
