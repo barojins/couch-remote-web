@@ -43,20 +43,26 @@ const {runInNewContext}=await import('node:vm');
 const {webcrypto}=await import('node:crypto');
 const appSource=(await readFile(new URL('../Web/app.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
-function browserHarness({saved=false,fail=false}={}) {
+function browserHarness({saved=false,fail=false,legacy=false}={}) {
   const token='t'.repeat(43), client='01234567-89ab-4def-8123-456789abcdef';
   const values=new Map(), storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
   if(saved)saveConnection(storage,token,client);
   const elements=new Map(), listeners={}, timers=new Map(), calls=[];
   let timerID=0;
   const get=id=>{
-    if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,value:'',textContent:'',style:{},classList:{toggle(){}},addEventListener(){},focus(){},showModal(){},close(){}});
+    if(!elements.has(id)) {
+      const handlers={},attributes=new Map();
+      elements.set(id,{hidden:false,disabled:false,value:'',textContent:'',style:{},classList:{toggle(){}},handlers,
+        addEventListener:(name,fn)=>handlers[name]=fn,focus(){},setPointerCapture(){},
+        setAttribute:(key,value)=>attributes.set(key,value),removeAttribute:key=>attributes.delete(key),hasAttribute:key=>attributes.has(key),
+        ...(!legacy?{showModal(){},close(){}}:{})});
+    }
     return elements.get(id);
   };
   const document={hidden:false,getElementById:get,querySelectorAll:()=>[],addEventListener:(name,fn)=>listeners[name]=fn};
   let state='ready', failure=fail, rejected=false;
   const context={document,location:{hash:saved?'':'#'+'q'.repeat(43),pathname:'/'},history:{replaceState(){}},localStorage:storage,
-    crypto:webcrypto,Gesture,coalesce,loadConnection,saveConnection,forgetConnection,retryDelay,AbortController,TextEncoder,
+    ...(legacy?{}:{PointerEvent:function(){}}),crypto:webcrypto,Gesture,coalesce,loadConnection,saveConnection,forgetConnection,retryDelay,AbortController,TextEncoder,
     setTimeout:(fn,ms)=>{const id=++timerID;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),
     requestAnimationFrame:fn=>{const id=++timerID;timers.set(id,{fn,ms:16});return id;},cancelAnimationFrame:id=>timers.delete(id),
     addEventListener:(name,fn)=>listeners[name]=fn,
@@ -95,4 +101,34 @@ test('saved phone reconnects after network failure and stops retrying after revo
   assert.equal(loadConnection(page.storage),null);
   assert.equal(page.get('entry').hidden,false);
   assert.equal(page.timers.size,0);
+});
+
+test('iOS 12 touch path sends movement and right click, and opens fallback keyboard',async()=>{
+  const page=browserHarness({saved:true,legacy:true});await settle();
+  const pad=page.get('trackpad');
+  assert.equal(pad.handlers.pointerdown,undefined);
+  const touch=(name,points,time)=>pad.handlers[name]({changedTouches:points.map(([identifier,clientX,clientY])=>({identifier,clientX,clientY})),timeStamp:time,preventDefault(){}});
+  const flush=async()=>{const entry=[...page.timers.entries()].find(([,t])=>t.ms===16);assert.ok(entry);page.timers.delete(entry[0]);entry[1].fn();await settle();};
+  touch('touchstart',[[1,0,0]],0);touch('touchmove',[[1,20,0]],50);touch('touchend',[[1,20,0]],80);
+  await flush();
+  assert.equal(JSON.parse(page.calls.filter(c=>c.path==='/api/commands').at(-1).options.body)[0].type,'move');
+  touch('touchstart',[[1,0,0],[2,20,0]],200);touch('touchend',[[1,0,0],[2,20,0]],250);
+  await flush();
+  assert.deepEqual(JSON.parse(page.calls.filter(c=>c.path==='/api/commands').at(-1).options.body),[{type:'rightClick'}]);
+  touch('touchstart',[[1,0,0]],400);pad.handlers.touchcancel();touch('touchend',[[1,0,0]],450);
+  assert.equal([...page.timers.values()].some(t=>t.ms===280),false);
+  page.get('keyboard').onclick();
+  assert.equal(page.get('keyboardDialog').hasAttribute('open'),true);
+  assert.equal(page.get('main').hasAttribute('aria-hidden'),true);
+  page.get('done').onclick();
+  assert.equal(page.get('keyboardDialog').hasAttribute('open'),false);
+  assert.equal(page.get('main').hasAttribute('aria-hidden'),false);
+});
+test('modern browsers register only pointer input and retain native keyboard dialog',async()=>{
+  const page=browserHarness({saved:true});await settle();
+  assert.equal(page.get('trackpad').handlers.touchstart,undefined);
+  assert.equal(typeof page.get('trackpad').handlers.pointerdown,'function');
+  let opened=false;page.get('keyboardDialog').showModal=()=>opened=true;
+  page.get('keyboard').onclick();assert.equal(opened,true);
+  assert.equal(page.get('main').hasAttribute('aria-hidden'),false);
 });

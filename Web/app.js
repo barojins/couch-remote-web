@@ -3,13 +3,13 @@ import {loadConnection, saveConnection, forgetConnection, retryDelay} from './co
 const $ = id => document.getElementById(id);
 let storage; try { storage=localStorage; } catch {}
 const saved=loadConnection(storage);
-let token = saved?.token || location.hash.slice(1);
+let token = (saved && saved.token) || location.hash.slice(1);
 history.replaceState(null, '', location.pathname);
 // Persist only a credential issued after explicit Mac approval, never the QR token.
 const random = crypto.getRandomValues(new Uint8Array(16));
 random[6] = (random[6] & 15) | 64; random[8] = (random[8] & 63) | 128;
 const hex = [...random].map(x=>x.toString(16).padStart(2,'0')).join('');
-const client = saved?.client || `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+const client = (saved && saved.client) || `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 let ready=false, active=false, queue=[], sending=false, polling=null, frame=null, tapTimer=null, lastTap=0, textBusy=false, generation=0;
 let retryTimer=null, attempts=0, connecting=false;
 const gesture = new Gesture();
@@ -66,7 +66,7 @@ async function connect() {
 }
 function enqueue(command) {
   if(!ready || textBusy || !command)return;
-  const merged=coalesce(queue.at(-1),command);
+  const merged=coalesce(queue[queue.length-1],command);
   if(merged)queue[queue.length-1]=merged;
   else if(queue.length<256)queue.push(command);
   else {recover('Connection too slow. Reconnecting…');return;}
@@ -80,14 +80,63 @@ async function flush(){
   catch(error){if(current===generation)recover(error.message+' Input was not replayed.');}
   finally{sending=false;if(queue.length)schedule();}
 }
-$('trackpad').addEventListener('pointerdown',e=>{if(!ready)return;e.preventDefault();$('trackpad').setPointerCapture(e.pointerId);gesture.down(e.pointerId,e.clientX,e.clientY,e.timeStamp);if(gesture.maxTouches===2){clearTimeout(tapTimer);tapTimer=null;}});
-$('trackpad').addEventListener('pointermove',e=>{if(!ready)return;e.preventDefault();enqueue(gesture.move(e.pointerId,e.clientX,e.clientY,e.timeStamp));});
-$('trackpad').addEventListener('pointerup',e=>{if(!ready)return;e.preventDefault();const kind=gesture.up(e.pointerId,e.timeStamp);if(kind==='rightClick'){clearTimeout(tapTimer);tapTimer=null;enqueue({type:kind});}else if(kind==='click'){if(tapTimer && e.timeStamp-lastTap<280){clearTimeout(tapTimer);tapTimer=null;enqueue({type:'doubleClick'});}else{lastTap=e.timeStamp;tapTimer=setTimeout(()=>{tapTimer=null;enqueue({type:'click'});},280);}}});
-$('trackpad').addEventListener('pointercancel',()=>gesture.reset());
-$('trackpad').addEventListener('contextmenu',e=>e.preventDefault());
-$('trackpad').addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();enqueue({type:e.shiftKey?'rightClick':'click'});}});
-$('keyboard').onclick=()=>{clearTimeout(tapTimer);tapTimer=null;$('keyboardDialog').showModal();$('text').focus();};
-$('done').onclick=()=>$('keyboardDialog').close();
+const pad=$('trackpad');
+function down(id,x,y,time) {
+  gesture.down(id,x,y,time);
+  if(gesture.maxTouches===2){clearTimeout(tapTimer);tapTimer=null;}
+}
+function up(id,time) {
+  const kind=gesture.up(id,time);
+  if(kind==='rightClick'){clearTimeout(tapTimer);tapTimer=null;enqueue({type:kind});}
+  else if(kind==='click'){
+    if(tapTimer && time-lastTap<280){clearTimeout(tapTimer);tapTimer=null;enqueue({type:'doubleClick'});}
+    else{lastTap=time;tapTimer=setTimeout(()=>{tapTimer=null;enqueue({type:'click'});},280);}
+  }
+}
+function cancelGesture(){gesture.reset();clearTimeout(tapTimer);tapTimer=null;}
+if(typeof PointerEvent!=='undefined') {
+  pad.addEventListener('pointerdown',e=>{if(!ready)return;e.preventDefault();pad.setPointerCapture(e.pointerId);down(e.pointerId,e.clientX,e.clientY,e.timeStamp);});
+  pad.addEventListener('pointermove',e=>{if(!ready)return;e.preventDefault();enqueue(gesture.move(e.pointerId,e.clientX,e.clientY,e.timeStamp));});
+  pad.addEventListener('pointerup',e=>{if(!ready)return;e.preventDefault();up(e.pointerId,e.timeStamp);});
+  pad.addEventListener('pointercancel',cancelGesture);
+} else {
+  // iOS 12 has Touch Events but no Pointer Events. Register only one input path.
+  ['touchstart','touchmove','touchend'].forEach(name=>pad.addEventListener(name,e=>{
+    if(!ready)return;
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t=>{
+      if(name==='touchstart')down(t.identifier,t.clientX,t.clientY,e.timeStamp);
+      else if(name==='touchmove')enqueue(gesture.move(t.identifier,t.clientX,t.clientY,e.timeStamp));
+      else up(t.identifier,e.timeStamp);
+    });
+  },{passive:false}));
+  pad.addEventListener('touchcancel',cancelGesture,{passive:false});
+}
+pad.addEventListener('contextmenu',e=>e.preventDefault());
+pad.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();enqueue({type:e.shiftKey?'rightClick':'click'});}});
+const keyboardDialog=$('keyboardDialog');
+function closeKeyboard(){
+  if(typeof keyboardDialog.close==='function')keyboardDialog.close();
+  else {keyboardDialog.removeAttribute('open');$('main').removeAttribute('aria-hidden');}
+  $('keyboard').focus();
+}
+$('keyboard').onclick=()=>{
+  cancelGesture();
+  if(typeof keyboardDialog.showModal==='function')keyboardDialog.showModal();
+  else {keyboardDialog.setAttribute('open','');$('main').setAttribute('aria-hidden','true');}
+  $('text').focus();
+};
+$('done').onclick=closeKeyboard;
+keyboardDialog.addEventListener('keydown',e=>{
+  if(typeof keyboardDialog.showModal==='function')return;
+  if(e.key==='Escape' && !textBusy){e.preventDefault();closeKeyboard();}
+  if(e.key==='Tab'){
+    const items=Array.from(keyboardDialog.querySelectorAll('button, textarea')).filter(el=>!el.disabled);
+    const first=items[0],last=items[items.length-1];
+    if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+  }
+});
 $('keyboardDialog').addEventListener('cancel',e=>{if(textBusy)e.preventDefault();});
 $('text').oninput=()=>{$('text').style.height='auto';$('text').style.height=Math.min(160,$('text').scrollHeight)+'px';controls();};
 document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>enqueue({type:'key',key:b.dataset.key}));

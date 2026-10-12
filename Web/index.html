@@ -13,7 +13,7 @@
   <script type="module" src="/app.js"></script>
 </head>
 <body>
-  <main>
+  <main id="main">
     <header><h1>Couch Remote</h1><button id="keyboard" disabled><span aria-hidden="true">⌨</span> Keyboard</button></header>
     <form id="entry" hidden>
       <label for="entryCode">Mac connection code</label>
@@ -23,8 +23,8 @@
     <div id="trackpad" role="application" aria-label="Mac trackpad: slide to move, tap to click, two-finger tap to right-click, two fingers to scroll" tabindex="0"></div>
     <footer><button id="connect" hidden>Reconnect</button><p id="status" role="status">Connecting…</p></footer>
   </main>
-  <dialog id="keyboardDialog">
-    <div class="dialog-heading"><h2>Keyboard</h2><button id="done" class="quiet">Done</button></div>
+  <dialog id="keyboardDialog" role="dialog" aria-modal="true" aria-labelledby="keyboardTitle">
+    <div class="dialog-heading"><h2 id="keyboardTitle">Keyboard</h2><button id="done" class="quiet">Done</button></div>
     <form id="composer"><textarea id="text" rows="1" placeholder="Type…" aria-label="Text to send" maxlength="4096"></textarea><button id="send" aria-label="Send text" disabled>↑</button></form>
     <div id="keys"><button data-key="returnKey">Return</button><button data-key="backspace" aria-label="Backspace">⌫</button><button data-key="escape">Esc</button><button data-key="space">Space</button><button data-key="tab">Tab</button><button data-key="up" aria-label="Up arrow">↑</button><button data-key="left" aria-label="Left arrow">←</button><button data-key="down" aria-label="Down arrow">↓</button><button data-key="right" aria-label="Right arrow">→</button></div>
     <p id="keyboardStatus" role="status"></p>

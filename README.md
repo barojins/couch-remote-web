@@ -16,6 +16,10 @@ Mac 수신 앱 + iPhone Safari 리모컨. 같은 Wi-Fi에서 포인터 이동, �
 
 초기 릴리스의 DMG는 개인 테스트용 ad-hoc 서명이며 Apple 공증을 받지 않았습니다. macOS가 차단할 수 있습니다. 정식 Developer ID 서명/공증 절차는 [배포 안내](Docs/DISTRIBUTION.md)를 참고하세요. 공개 릴리스는 GitHub 로그인 없이 다운로드할 수 있습니다.
 
+## iPhone 5s / iOS 12
+
+iOS 12 Safari를 위한 터치 이벤트, 키보드 창, 화면 배치 대체 동작을 제공합니다. 최신 Mac 수신 앱으로 업데이트한 뒤 Safari 페이지를 새로 고치세요. 자동화 테스트는 통과했지만 iPhone 5s 실기기 검증은 아직 필요합니다.
+
 ## Safari 도구 막대 없이 사용하기
 
 1. 먼저 QR로 Safari에서 리모컨을 엽니다.
