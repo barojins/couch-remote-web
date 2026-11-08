@@ -5,7 +5,8 @@ let storage; try { storage=localStorage; } catch {}
 const saved=loadConnection(storage);
 let deviceName=""; try { deviceName=storage.getItem("couch-remote-name") || ""; } catch {}
 let needsName=!saved && !deviceName;
-let token = (saved && saved.token) || location.hash.slice(1);
+let qrToken = location.hash.slice(1);
+let token = (saved && saved.token) || qrToken;
 history.replaceState(null, '', location.pathname);
 // Persist only a credential issued after explicit Mac approval, never the QR token.
 const random = crypto.getRandomValues(new Uint8Array(16));
@@ -15,10 +16,15 @@ const client = (saved && saved.client) || `${hex.slice(0,8)}-${hex.slice(8,12)}-
 let ready=false, active=false, queue=[], sending=false, polling=null, frame=null, tapTimer=null, lastTap=0, textBusy=false, generation=0;
 let retryTimer=null, attempts=0, connecting=false;
 let tuning=loadMovement(storage);
+let scrollContact=null, scrollTimer=null, scrollFraction=0;
 const gesture = new Gesture(tuning);
 function setMessage(text) { $('status').textContent=text; $('keyboardStatus').textContent=text; }
 function controls() {
   $('trackpad').classList.toggle('ready',ready); $('keyboard').disabled=!ready;
+  $('scrollRail').classList.toggle('ready',ready && !textBusy);
+  $('scrollUp').disabled=$('scrollDown').disabled=!ready || textBusy;
+  $('scrollDrag').setAttribute('aria-disabled',String(!ready || textBusy));
+  if(!ready || textBusy)cancelScroll();
   $('send').disabled=!ready || textBusy || !$('text').value;
   $('text').disabled=textBusy; $('done').disabled=textBusy;
   document.querySelectorAll('[data-key]').forEach(b=>b.disabled=!ready || textBusy);
@@ -35,6 +41,7 @@ async function api(path,body={}) {
 function apply(result) {
   if(result.deviceToken) {
     token=result.deviceToken;
+    qrToken='';
     saveConnection(storage,token,client);
   }
   ready=result.state==='ready';
@@ -45,6 +52,7 @@ function apply(result) {
   controls();
 }
 function stop(message) {
+  cancelScroll();
   generation++; connecting=false; clearTimeout(retryTimer); retryTimer=null; ready=false; active=false; queue=[]; gesture.reset();
   clearTimeout(polling); clearTimeout(tapTimer); tapTimer=null; cancelAnimationFrame(frame); frame=null; textBusy=false;
   $('pairing').hidden=true; $('entry').hidden=!!token; $('connect').hidden=!token; setMessage(message); controls();
@@ -65,8 +73,31 @@ async function connect() {
   if(document.hidden || connecting || active)return;
   if(!token) {stop('Enter the connection code shown on your Mac.');return;}
   stop('Connecting…'); connecting=true; const current=generation; $('connect').hidden=true;
-  try {const r=await api('/api/connect',{deviceName}); if(current!==generation)return; connecting=false; active=true; apply(r); poll();}
-  catch(error){if(current===generation){if(error.status===403){token='';forgetConnection(storage);stop('Approve this phone again using the code on your Mac.');}else recover(error.message);}}
+  try {
+    let result;
+    try { result=await api('/api/connect',{deviceName}); }
+    catch(error) {
+      if(current!==generation)return;
+      if(error.status!==403)throw error;
+      // Approval may have happened while Safari was suspended. The bootstrap
+      // token can still collect this client's credential through status.
+      result=await api('/api/status');
+    }
+    if(current!==generation)return;
+    connecting=false; active=true; apply(result); poll();
+  } catch(error) {
+    if(current!==generation)return;
+    if(error.status===403) {
+      forgetConnection(storage);
+      if(qrToken && token!==qrToken) {
+        // Keep a newly scanned link available when a saved approval was revoked.
+        token=qrToken; qrToken=''; connecting=false;
+        return connect();
+      }
+      token=''; qrToken='';
+      stop('Approve this phone again using the code on your Mac.');
+    } else recover(error.message);
+  }
 }
 function enqueue(command) {
   if(!ready || textBusy || !command)return;
@@ -123,6 +154,65 @@ if(typeof PointerEvent!=='undefined') {
 }
 pad.addEventListener('contextmenu',e=>e.preventDefault());
 pad.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();enqueue({type:e.shiftKey?'rightClick':'click'});}});
+function cancelScroll() {
+  clearTimeout(scrollTimer); scrollTimer=null; scrollContact=null; scrollFraction=0;
+}
+function scrollBy(amount) {
+  if(!ready || textBusy)return;
+  scrollFraction+=amount*tuning.scrollSpeed;
+  const y=Math.trunc(scrollFraction); scrollFraction-=y;
+  if(y)enqueue({type:'scroll',x:0,y:Math.max(-8192,Math.min(8192,y))});
+}
+function startScroll(id,y,direction) {
+  if(!ready || textBusy || scrollContact)return false;
+  cancelGesture();
+  scrollContact={id,y};
+  if(direction) {
+    scrollBy(direction*40);
+    const repeat=()=>{
+      if(!scrollContact || !ready || textBusy)return;
+      scrollBy(direction*12);
+      if(scrollContact)scrollTimer=setTimeout(repeat,60);
+    };
+    scrollTimer=setTimeout(repeat,350);
+  }
+  return true;
+}
+function moveScroll(id,y) {
+  if(!scrollContact || scrollContact.id!==id)return;
+  const delta=y-scrollContact.y; scrollContact.y=y; scrollBy(delta);
+}
+function endScroll(id) { if(scrollContact && scrollContact.id===id)cancelScroll(); }
+[['scrollDrag',0],['scrollUp',1],['scrollDown',-1]].forEach(([id,direction])=>{
+  const element=$(id);
+  if(typeof PointerEvent!=='undefined') {
+    element.addEventListener('pointerdown',e=>{
+      if(e.button!==0 || !startScroll(e.pointerId,e.clientY,direction))return;
+      e.preventDefault(); element.setPointerCapture(e.pointerId);
+    });
+    element.addEventListener('pointermove',e=>{if(!direction)moveScroll(e.pointerId,e.clientY);});
+    ['pointerup','pointercancel','lostpointercapture'].forEach(name=>element.addEventListener(name,e=>endScroll(e.pointerId)));
+  } else {
+    element.addEventListener('touchstart',e=>{
+      const touch=e.changedTouches[0];
+      if(touch && startScroll(touch.identifier,touch.clientY,direction))e.preventDefault();
+    },{passive:false});
+    element.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      if(!direction)Array.from(e.changedTouches).forEach(t=>moveScroll(t.identifier,t.clientY));
+    },{passive:false});
+    ['touchend','touchcancel'].forEach(name=>element.addEventListener(name,e=>{
+      Array.from(e.changedTouches).forEach(t=>endScroll(t.identifier));
+    }));
+  }
+  element.addEventListener('contextmenu',e=>e.preventDefault());
+  // Keyboard and assistive-technology clicks have no pointer press to handle.
+  if(direction)element.onclick=e=>{if(e.detail===0)scrollBy(direction*40);};
+});
+$('scrollDrag').addEventListener('keydown',e=>{
+  if(e.key==='ArrowUp' || e.key==='ArrowDown') {e.preventDefault();scrollBy(e.key==='ArrowUp'?40:-40);}
+});
+addEventListener('blur',cancelScroll);
 function bindDialog(dialogID,openID,closeID,focusID) {
   const dialog=$(dialogID);
   function close(){
@@ -131,7 +221,7 @@ function bindDialog(dialogID,openID,closeID,focusID) {
     $(openID).focus();
   }
   $(openID).onclick=()=>{
-    cancelGesture();
+    cancelGesture();cancelScroll();
     if(typeof dialog.showModal==='function')dialog.showModal();
     else {dialog.setAttribute('open','');$('main').setAttribute('aria-hidden','true');}
     $(focusID).focus();
@@ -152,16 +242,16 @@ bindDialog('keyboardDialog','keyboard','done','text');
 bindDialog('settingsDialog','settings','settingsDone','sensitivity');
 bindDialog('helpDialog','help','helpDone','helpDone');
 function showTuning(){
-  ['sensitivity','acceleration','smoothing'].forEach(key=>{
+  ['sensitivity','acceleration','smoothing','scrollSpeed'].forEach(key=>{
     $(key).value=tuning[key];
     $(key+'Value').textContent=key==='smoothing'?tuning[key]+' ms':tuning[key].toFixed(2)+'×';
   });
 }
 function updateTuning(){
-  cancelGesture();gesture.configure(tuning);showTuning();
+  cancelGesture();cancelScroll();gesture.configure(tuning);showTuning();
   $('settingsStatus').textContent=saveMovement(storage,tuning)?'':'Applies now; browser storage is unavailable.';
 }
-['sensitivity','acceleration','smoothing'].forEach(key=>$(key).oninput=()=>{tuning[key]=Number($(key).value);updateTuning();});
+['sensitivity','acceleration','smoothing','scrollSpeed'].forEach(key=>$(key).oninput=()=>{tuning[key]=Number($(key).value);updateTuning();});
 $('resetMovement').onclick=()=>{tuning=Object.assign({},movementDefaults);updateTuning();};
 showTuning();
 $('keyboardDialog').addEventListener('cancel',e=>{if(textBusy)e.preventDefault();});

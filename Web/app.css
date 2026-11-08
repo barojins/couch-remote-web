@@ -9,6 +9,14 @@ p { color: #9daaaa; font-size: 14px; line-height: 1.5; margin: 6px 0; }
 #keyboard span { margin-right: 5px; }
 #trackpad { flex: 1; min-height: 0; background: #ffffff08; border: 1px solid #ffffff20; border-radius: 26px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; opacity: .4; }
 #trackpad.ready { opacity: 1; }
+#padArea { display: flex; flex: 1; min-height: 0; }
+#trackpad { min-width: 0; }
+#scrollRail { display: flex; flex-direction: column; flex: 0 0 48px; margin-left: 8px; border: 1px solid #ffffff20; border-radius: 24px; background: #ffffff08; opacity: .4; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+#scrollRail.ready { opacity: 1; }
+#scrollRail button { flex: 0 0 48px; width: 100%; padding: 0; border: 0; border-radius: 0; background: none; font-size: 12px; color: var(--accent); touch-action: none; }
+#scrollDrag { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; color: #9daaaa; touch-action: none; }
+#scrollRail button:active, #scrollDrag:active { background: #ffffff0c; }
+#scrollDrag:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 footer { flex-shrink: 0; text-align: center; }
 #status { font-size: 12px; margin: 0; }
 #connect { margin-bottom: 10px; }

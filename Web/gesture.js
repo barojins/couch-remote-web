@@ -1,7 +1,7 @@
-export const movementDefaults = {sensitivity:1, acceleration:1, smoothing:40};
+export const movementDefaults = {sensitivity:1, acceleration:1, smoothing:40, scrollSpeed:1};
 export function movementSettings(value) {
   const result = {};
-  for (const [key,min,max] of [['sensitivity',.25,2],['acceleration',0,2],['smoothing',0,100]]) {
+  for (const [key,min,max] of [['sensitivity',.25,2],['acceleration',0,2],['smoothing',0,100],['scrollSpeed',.25,3]]) {
     const number = value && value[key];
     result[key] = typeof number === 'number' && Number.isFinite(number) ? Math.max(min,Math.min(max,number)) : movementDefaults[key];
   }
@@ -28,7 +28,7 @@ export class Motion {
     const weight = this.settings.smoothing === 0 ? 1 : 1 - Math.exp(-Math.max(0, dt) / (this.settings.smoothing/1000));
     this.speed = this.speed === null ? speed : this.speed + weight * (speed - this.speed);
     const t = Math.min(1, Math.max(0, (this.speed - 40) / 760));
-    const gain = scrolling ? 1 : this.settings.sensitivity * (.8 + 1.2 * this.settings.acceleration * t * t * (3 - 2 * t));
+    const gain = scrolling ? this.settings.scrollSpeed : this.settings.sensitivity * (.8 + 1.2 * this.settings.acceleration * t * t * (3 - 2 * t));
     this.x += x * gain; this.y += y * gain;
     const dx = Math.trunc(this.x), dy = Math.trunc(this.y);
     this.x -= dx; this.y -= dy;

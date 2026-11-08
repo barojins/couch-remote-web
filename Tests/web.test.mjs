@@ -43,7 +43,7 @@ const {runInNewContext}=await import('node:vm');
 const {webcrypto}=await import('node:crypto');
 const appSource=(await readFile(new URL('../Web/app.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
-function browserHarness({saved=false,fail=false,legacy=false,commandGate=null,unnamed=false}={}) {
+function browserHarness({saved=false,fail=false,legacy=false,commandGate=null,unnamed=false,hash=saved?'':'#'+'q'.repeat(43),respond=null}={}) {
   const token='t'.repeat(43), client='01234567-89ab-4def-8123-456789abcdef';
   const values=new Map(), storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
   if(saved)saveConnection(storage,token,client);
@@ -62,7 +62,7 @@ function browserHarness({saved=false,fail=false,legacy=false,commandGate=null,un
   };
   const document={hidden:false,getElementById:get,querySelectorAll:selector=>selector==='[data-key]'?['volumeDown','mute','volumeUp'].map(key=>{const b=get(key);b.dataset={key};return b;}):[],addEventListener:(name,fn)=>listeners[name]=fn};
   let state='ready', failure=fail, rejected=false;
-  const context={document,location:{hash:saved?'':'#'+'q'.repeat(43),pathname:'/'},history:{replaceState(){}},localStorage:storage,
+  const context={document,location:{hash,pathname:'/'},history:{replaceState(){}},localStorage:storage,
     ...(legacy?{}:{PointerEvent:function(){}}),crypto:webcrypto,Gesture,coalesce,movementDefaults,loadMovement,saveMovement,loadConnection,saveConnection,forgetConnection,retryDelay,AbortController,TextEncoder,
     setTimeout:(fn,ms)=>{const id=++timerID;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),
     requestAnimationFrame:fn=>{const id=++timerID;timers.set(id,{fn,ms:16});return id;},cancelAnimationFrame:id=>timers.delete(id),
@@ -71,6 +71,10 @@ function browserHarness({saved=false,fail=false,legacy=false,commandGate=null,un
       calls.push({path,options});
       if(path==='/api/commands' && commandGate)await commandGate();
       if(failure)throw new Error('offline');
+      if(respond) {
+        const {status=200,body}=await respond(path,options);
+        return {ok:status===200,status,json:async()=>body};
+      }
       return {ok:!rejected,status:rejected?403:200,json:async()=>rejected?{error:'revoked'}:{state,code:'',...(!saved && path==='/api/status'?{deviceToken:token}:{})}};
     }
   };
@@ -78,6 +82,49 @@ function browserHarness({saved=false,fail=false,legacy=false,commandGate=null,un
   return {get,document,listeners,timers,calls,storage,token,
     setFailure:value=>failure=value,setRejected:value=>rejected=value,setState:value=>state=value};
 }
+
+// Model the receiver's bootstrap restrictions: approval permits credential
+// collection through status, but connect requires the issued credential.
+function pairingReceiver() {
+  const bootstrap='q'.repeat(43), credential='n'.repeat(43);
+  let owner=null, approved=false;
+  return {bootstrap,credential,approve(){approved=true;},respond(path,options) {
+    const token=options.headers.Authorization.slice(7), client=options.headers['X-Couch-Client'];
+    const trusted=token===credential;
+    if(token!==bootstrap && !trusted)return {status:403,body:{error:'revoked'}};
+    if(approved && !trusted && !(path==='/api/status' && owner===client))
+      return {status:403,body:{error:'Use approved credential'}};
+    if(path==='/api/connect')owner=client;
+    else if(owner!==client)return {status:401,body:{error:'Connection expired'}};
+    return {body:{state:approved?'ready':'pending',code:approved?'':'123456',
+      ...(approved && !trusted && path==='/api/status'?{deviceToken:credential}:{})}};
+  }};
+}
+test('fresh QR survives rejection of a saved revoked credential',async()=>{
+  const receiver=pairingReceiver();
+  const page=browserHarness({saved:true,hash:'#'+receiver.bootstrap,respond:receiver.respond});
+  await settle();
+  assert.equal(page.get('pairing').hidden,false);
+  assert.equal(page.get('entry').hidden,true);
+  assert.equal(loadConnection(page.storage),null,'bootstrap credentials must not be persisted');
+  assert.ok(page.calls.some(c=>c.path==='/api/connect' && c.options.headers.Authorization==='Bearer '+receiver.bootstrap));
+  receiver.approve();
+  const poll=[...page.timers.values()].find(t=>t.ms===2000);assert.ok(poll);poll.fn();await settle();
+  assert.equal(loadConnection(page.storage).token,receiver.credential);
+  assert.equal(page.get('keyboard').disabled,false);
+});
+test('approval while hidden is collected on resume without pairing again',async()=>{
+  const receiver=pairingReceiver();
+  const page=browserHarness({respond:receiver.respond});await settle();
+  assert.equal(page.get('pairing').hidden,false);
+  page.document.hidden=true;page.listeners.visibilitychange();
+  receiver.approve();
+  page.document.hidden=false;page.listeners.visibilitychange();await settle();
+  assert.equal(page.get('keyboard').disabled,false);
+  assert.equal(loadConnection(page.storage).token,receiver.credential);
+  assert.equal(page.get('entry').hidden,true);
+  assert.equal(page.calls.some(c=>c.path==='/api/commands'),false);
+});
 test('page hide does not disconnect; returning reuses approved credential without replaying input',async()=>{
   const page=browserHarness();
   await settle();
@@ -182,11 +229,11 @@ test('volume buttons enqueue commands when connected and disable when suspended'
 });
 
 test('movement settings clamp invalid values, persist, and preserve defaults',()=>{
-  assert.deepEqual(movementSettings({sensitivity:20,acceleration:-1,smoothing:'x'}),{sensitivity:2,acceleration:0,smoothing:40});
+  assert.deepEqual(movementSettings({sensitivity:20,acceleration:-1,smoothing:'x',scrollSpeed:99}),{sensitivity:2,acceleration:0,smoothing:40,scrollSpeed:3});
   assert.deepEqual(loadMovement(undefined),movementDefaults);
   assert.equal(saveMovement(undefined,movementDefaults),false);
   let stored;const storage={getItem:()=>stored,setItem:(key,value)=>stored=value};
-  const settings={sensitivity:.5,acceleration:0,smoothing:0};
+  const settings={sensitivity:.5,acceleration:0,smoothing:0,scrollSpeed:1};
   assert.equal(saveMovement(storage,settings),true);assert.deepEqual(loadMovement(storage),settings);
   assert.equal(new Motion(settings).delta(10,0,5000).x,4);
   assert.equal(new Motion(settings).delta(10,0,10).x,4);
@@ -213,4 +260,69 @@ test('first pairing asks for a name before connecting and sends it to the Mac',a
   assert.equal(page.get('deviceSetup').hidden,true);
   assert.equal(JSON.parse(page.calls[0].options.body).deviceName,'iPhone 5s');
   assert.equal(page.storage.getItem('couch-remote-name'),'iPhone 5s');
+});
+
+async function runTimer(page,ms) {
+  const entry=[...page.timers.entries()].find(([,timer])=>timer.ms===ms);
+  assert.ok(entry,`Expected ${ms}ms timer`);
+  page.timers.delete(entry[0]);entry[1].fn();await settle();
+}
+const scrollCommands=page=>page.calls.filter(c=>c.path==='/api/commands').flatMap(c=>JSON.parse(c.options.body));
+for(const legacy of [false,true])test(`scroll rail drags vertically without moving or clicking the pointer (${legacy?'touch':'pointer'})`,async()=>{
+  const page=browserHarness({saved:true,legacy});await settle();
+  page.get('scrollSpeed').value='0.25';page.get('scrollSpeed').oninput();
+  const handlers=page.get('scrollDrag').handlers;
+  const event=y=>legacy?{changedTouches:[{identifier:1,clientY:y}],preventDefault(){}}:{pointerId:1,button:0,clientY:y,preventDefault(){}};
+  handlers[legacy?'touchstart':'pointerdown'](event(0));
+  for(let y=1;y<=8;y++)handlers[legacy?'touchmove':'pointermove'](event(y));
+  await runTimer(page,16);
+  handlers[legacy?'touchmove':'pointermove'](event(0));await runTimer(page,16);
+  handlers[legacy?'touchend':'pointerup'](event(0));
+  assert.deepEqual(scrollCommands(page),[{type:'scroll',x:0,y:2},{type:'scroll',x:0,y:-2}]);
+  assert.equal([...page.timers.values()].some(t=>t.ms===280),false);
+  assert.equal(loadMovement(page.storage).scrollSpeed,.25);
+});
+test('scroll arrows step, repeat after a hold, and stop on release or cancellation',async()=>{
+  const page=browserHarness({saved:true});await settle();
+  const event={pointerId:1,button:0,clientY:0,preventDefault(){}};
+  const up=page.get('scrollUp'),down=page.get('scrollDown');
+  up.handlers.pointerdown(event);await runTimer(page,16);
+  await runTimer(page,350);await runTimer(page,16);
+  await runTimer(page,60);await runTimer(page,16);
+  up.handlers.pointerup(event);
+  assert.deepEqual(scrollCommands(page).map(c=>c.y),[40,12,12]);
+  assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  // A synthetic click after the physical press must not duplicate the step.
+  up.onclick({detail:1});assert.equal([...page.timers.values()].some(t=>t.ms===16),false);
+  down.onclick({detail:0});await runTimer(page,16);
+  assert.equal(scrollCommands(page).at(-1).y,-40);
+  for(const reason of ['pointercancel','lostpointercapture']) {
+    down.handlers.pointerdown(event);await runTimer(page,16);down.handlers[reason](event);
+    assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  }
+});
+test('held legacy scroll stops when hidden, opening a dialog, or losing permission',async()=>{
+  const page=browserHarness({saved:true,legacy:true});await settle();
+  const arrow=page.get('scrollDown');
+  const event={changedTouches:[{identifier:1,clientY:0}],preventDefault(){}};
+  arrow.handlers.touchstart(event);await runTimer(page,16);
+  page.document.hidden=true;page.listeners.visibilitychange();
+  assert.equal(arrow.disabled,true);
+  assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  page.document.hidden=false;page.listeners.visibilitychange();await settle();
+  arrow.handlers.touchstart(event);await runTimer(page,16);page.get('settings').onclick();
+  assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  page.get('settingsDone').onclick();
+  arrow.handlers.touchstart(event);await runTimer(page,16);page.setState('permission');await runTimer(page,2000);
+  assert.equal(arrow.disabled,true);
+  assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  const count=scrollCommands(page).length;
+  arrow.handlers.touchstart(event);await settle();
+  assert.equal(scrollCommands(page).length,count);
+});
+test('scroll speed migrates old preferences and scales two-finger scrolling independently',()=>{
+  assert.equal(loadMovement({getItem:()=>'{"sensitivity":2}'}).scrollSpeed,1);
+  const motion=new Motion({sensitivity:2,scrollSpeed:.25});
+  assert.deepEqual(motion.delta(0,10,100,true),{type:'scroll',x:0,y:2});
+  assert.deepEqual(motion.delta(0,10,100,true),{type:'scroll',x:0,y:3});
 });
