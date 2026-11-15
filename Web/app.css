@@ -16,11 +16,11 @@ button:focus-visible, input:focus-visible, #trackpad:focus-visible { outline: 2p
 #trackpad.ready { opacity: 1; }
 #scrollRail { display: flex; flex-direction: column; flex: 0 0 48px; margin-left: 8px; border: 1px solid #ffffff20; border-radius: 24px; background: #ffffff08; opacity: .4; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 #scrollRail.ready { opacity: 1; }
-#scrollRail button { flex: 0 0 48px; width: 100%; padding: 0; border: 0; border-radius: 0; background: none; font-size: 12px; color: var(--accent); touch-action: none; }
-#scrollDrag { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; color: #9daaaa; touch-action: none; }
-#scrollRail button:active, #scrollDrag:active { background: #ffffff0c; }
-#scrollDrag:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
-#navigation { display: grid; grid-template-columns: 1fr 44px 1fr; grid-gap: 5px; width: 50%; height: 52px; margin-left: auto; margin-right: auto; flex-shrink: 0; }
+#scrollRail button { flex: 1; min-height: 44px; width: 100%; padding: 0; border: 0; border-radius: 0; background: none; font-size: 12px; color: var(--accent); touch-action: none; }
+#scrollRail #scrollDown { border-top: 1px solid #ffffff20; }
+#scrollRail button:active { background: #ffffff0c; }
+#scrollRail button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+#navigation { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 2fr); grid-gap: 5px; width: 100%; height: 52px; margin-left: auto; margin-right: auto; flex-shrink: 0; }
 #navigation > button { height: 52px; min-height: 0; padding: 0; border-radius: 10px; font-size: 16px; color: var(--accent); }
 #playPause { display: flex; align-items: center; justify-content: center; }
 #playPause svg { width: 20px; height: 20px; fill: currentColor; }
@@ -59,8 +59,7 @@ summary { min-height: 44px; padding: 10px 0; }
 main.keyboard-open { padding-top: 10px; padding-bottom: 12px; }
 main.keyboard-open > * + * { margin-top: 8px; }
 main.keyboard-open #padArea { min-height: 48px; }
-main.keyboard-open #scrollRail button { flex-basis: 24px; min-height: 24px; }
-main.keyboard-open #scrollDrag { min-height: 0; }
+main.keyboard-open #scrollRail button { min-height: 24px; }
 @media (max-height: 480px) { main { padding-top: 10px; padding-bottom: 12px; } main > * + * { margin-top: 8px; } #deviceSetup, #entry, #pairing { padding: 8px; } }
 @media (max-height: 480px) and (orientation: landscape) {
   main.connected { max-width: 900px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 44px 52px minmax(100px, 1fr) auto; grid-gap: 8px 18px; }

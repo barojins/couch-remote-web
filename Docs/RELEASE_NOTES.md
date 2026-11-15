@@ -1,16 +1,11 @@
-## Couch Remote Web 1.0.10 (build 11)
+## Couch Remote Web 1.0.11 (build 12)
 
-A simpler English remote for controlling a Mac connected to a TV.
+Faster scrolling and wider playback controls for the TV remote.
 
-- Search from the main remote page. The phone keyboard's Search action sends the completed text and Return together.
-- Keep Help, settings, mute, and volume controls in one compact row.
-- Use compact left/right controls and a dedicated play/pause media button below the trackpad.
-- Connect multiple approved phones at the same time, with independent approval, reconnect, expiry, and Forget behavior.
-- See an approval countdown and explicitly request a new code after expiry.
-- Recover interrupted first-time pairing without consuming another approval attempt or replacing the original code.
-- Keep a pending tap ahead of subsequent movement so it clicks the intended location.
-- Prevent duplicate text sends when returning from the background, and retain a warning when a send's outcome is uncertain.
-- Remember the selected Mac network across restarts and DHCP changes.
+- Replace the right-side scroll drag area with two large up/down buttons.
+- Tap for a small scroll step, or hold for 0.35 seconds to scroll continuously at maximum speed, regardless of the saved Scroll speed setting.
+- Stop repeating when the button is released or the remote loses focus, without accumulating a scroll backlog while the network is busy.
+- Expand the playback row to the full available width, with left, play/pause, and right buttons in a 2:1:2 width ratio.
 
 Requires macOS 13 Ventura or later. Universal installer for Intel and Apple Silicon. The receiver and phone must use the same trusted private network.
 

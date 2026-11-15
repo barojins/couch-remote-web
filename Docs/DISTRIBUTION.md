@@ -43,7 +43,7 @@ The existing Ed25519 private key was stored in the release Mac's login Keychain 
 4. Generate the signed feed using the existing key and official Sparkle tools:
 
 ```sh
-SPARKLE_BIN=/path/to/Sparkle/bin Scripts/GenerateAppcast.sh v1.0.10
+SPARKLE_BIN=/path/to/Sparkle/bin Scripts/GenerateAppcast.sh v1.0.11
 ```
 
 5. Publish the GitHub release and upload the exact DMG and SHA256SUMS.txt before pushing the signed feed to `main`. This prevents the updater from advertising an unavailable download.

@@ -25,7 +25,6 @@ function controls() {
   $('trackpad').classList.toggle('ready',ready);
   $('scrollRail').classList.toggle('ready',ready && !textBusy);
   $('scrollUp').disabled=$('scrollDown').disabled=!ready || textBusy;
-  $('scrollDrag').setAttribute('aria-disabled',String(!ready || textBusy));
   if(!ready || textBusy)cancelScroll();
   $('send').disabled=!ready || textBusy || !$('text').value;
   $('text').disabled=!ready || textBusy;
@@ -186,60 +185,50 @@ pad.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDe
 function cancelScroll() {
   clearTimeout(scrollTimer); scrollTimer=null; scrollContact=null; scrollFraction=0;
 }
-function scrollBy(amount) {
+function scrollBy(amount,speed=tuning.scrollSpeed) {
   if(!ready || textBusy)return;
-  scrollFraction+=amount*tuning.scrollSpeed;
+  scrollFraction+=amount*speed;
   const y=Math.trunc(scrollFraction); scrollFraction-=y;
   if(y)enqueue({type:'scroll',x:0,y:Math.max(-8192,Math.min(8192,y))});
 }
-function startScroll(id,y,direction) {
+function startScroll(id,direction) {
   if(!ready || textBusy || scrollContact)return false;
   flushTap();cancelGesture();
-  scrollContact={id,y};
-  if(direction) {
-    scrollBy(direction*40);
-    const repeat=()=>{
-      if(!scrollContact || !ready || textBusy)return;
-      scrollBy(direction*12);
-      if(scrollContact)scrollTimer=setTimeout(repeat,60);
-    };
-    scrollTimer=setTimeout(repeat,350);
-  }
+  scrollContact={id};
+  scrollBy(direction*40);
+  const repeat=()=>{
+    if(!scrollContact || !ready || textBusy)return;
+    // Use the maximum speed (3x), regardless of the saved tap/gesture speed.
+    // Avoid accumulating held input while the network is busy, so releasing
+    // the button cannot replay a backlog of high-speed scroll commands.
+    if(!sending && !queue.length)scrollBy(direction*40,3);
+    if(scrollContact)scrollTimer=setTimeout(repeat,16);
+  };
+  scrollTimer=setTimeout(repeat,350);
   return true;
 }
-function moveScroll(id,y) {
-  if(!scrollContact || scrollContact.id!==id)return;
-  const delta=y-scrollContact.y; scrollContact.y=y; scrollBy(delta);
-}
 function endScroll(id) { if(scrollContact && scrollContact.id===id)cancelScroll(); }
-[['scrollDrag',0],['scrollUp',1],['scrollDown',-1]].forEach(([id,direction])=>{
+[['scrollUp',1],['scrollDown',-1]].forEach(([id,direction])=>{
   const element=$(id);
   if(typeof PointerEvent!=='undefined') {
     element.addEventListener('pointerdown',e=>{
-      if(e.button!==0 || !startScroll(e.pointerId,e.clientY,direction))return;
+      if(e.button!==0 || !startScroll(e.pointerId,direction))return;
       e.preventDefault(); element.setPointerCapture(e.pointerId);
     });
-    element.addEventListener('pointermove',e=>{if(!direction)moveScroll(e.pointerId,e.clientY);});
     ['pointerup','pointercancel','lostpointercapture'].forEach(name=>element.addEventListener(name,e=>endScroll(e.pointerId)));
   } else {
     element.addEventListener('touchstart',e=>{
       const touch=e.changedTouches[0];
-      if(touch && startScroll(touch.identifier,touch.clientY,direction))e.preventDefault();
+      if(touch && startScroll(touch.identifier,direction))e.preventDefault();
     },{passive:false});
-    element.addEventListener('touchmove',e=>{
-      e.preventDefault();
-      if(!direction)Array.from(e.changedTouches).forEach(t=>moveScroll(t.identifier,t.clientY));
-    },{passive:false});
+    element.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
     ['touchend','touchcancel'].forEach(name=>element.addEventListener(name,e=>{
       Array.from(e.changedTouches).forEach(t=>endScroll(t.identifier));
     }));
   }
   element.addEventListener('contextmenu',e=>e.preventDefault());
   // Keyboard and assistive-technology clicks have no pointer press to handle.
-  if(direction)element.onclick=e=>{if(e.detail===0)scrollBy(direction*40);};
-});
-$('scrollDrag').addEventListener('keydown',e=>{
-  if(e.key==='ArrowUp' || e.key==='ArrowDown') {e.preventDefault();scrollBy(e.key==='ArrowUp'?40:-40);}
+  element.onclick=e=>{if(e.detail===0)scrollBy(direction*40);};
 });
 addEventListener('blur',cancelScroll);
 function bindDialog(dialogID,openID,closeID,focusID) {

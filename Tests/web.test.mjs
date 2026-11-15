@@ -359,38 +359,60 @@ async function runTimer(page,ms) {
   page.timers.delete(entry[0]);page.advanceTime(ms);entry[1].fn();await settle();
 }
 const scrollCommands=page=>page.calls.filter(c=>c.path==='/api/commands').flatMap(c=>JSON.parse(c.options.body));
-for(const legacy of [false,true])test(`scroll rail drags vertically without moving or clicking the pointer (${legacy?'touch':'pointer'})`,async()=>{
+for(const legacy of [false,true])test(`right scroll buttons replace the drag area and preserve tap speed (${legacy?'touch':'pointer'})`,async()=>{
   const page=browserHarness({saved:true,legacy});await settle();
   page.get('scrollSpeed').value='0.25';page.get('scrollSpeed').oninput();
-  const handlers=page.get('scrollDrag').handlers;
-  const event=y=>legacy?{changedTouches:[{identifier:1,clientY:y}],preventDefault(){}}:{pointerId:1,button:0,clientY:y,preventDefault(){}};
-  handlers[legacy?'touchstart':'pointerdown'](event(0));
-  for(let y=1;y<=8;y++)handlers[legacy?'touchmove':'pointermove'](event(y));
-  await runTimer(page,16);
-  handlers[legacy?'touchmove':'pointermove'](event(0));await runTimer(page,16);
-  handlers[legacy?'touchend':'pointerup'](event(0));
-  assert.deepEqual(scrollCommands(page),[{type:'scroll',x:0,y:2},{type:'scroll',x:0,y:-2}]);
+  const event=legacy?{changedTouches:[{identifier:1}],preventDefault(){}}:{pointerId:1,button:0,preventDefault(){}};
+  for(const id of ['scrollUp','scrollDown']) {
+    const handlers=page.get(id).handlers;
+    handlers[legacy?'touchstart':'pointerdown'](event);
+    handlers[legacy?'touchend':'pointerup'](event);
+    await runTimer(page,16);
+  }
+  assert.deepEqual(scrollCommands(page),[{type:'scroll',x:0,y:10},{type:'scroll',x:0,y:-10}]);
+  assert.equal(appHTML.includes('id="scrollDrag"'),false);
   assert.equal([...page.timers.values()].some(t=>t.ms===280),false);
   assert.equal(loadMovement(page.storage).scrollSpeed,.25);
 });
-test('scroll arrows step, repeat after a hold, and stop on release or cancellation',async()=>{
-  const page=browserHarness({saved:true});await settle();
-  const event={pointerId:1,button:0,clientY:0,preventDefault(){}};
+for(const legacy of [false,true])test(`held scroll uses maximum speed and stops on release or cancellation (${legacy?'touch':'pointer'})`,async()=>{
+  const page=browserHarness({saved:true,legacy});await settle();
+  page.get('scrollSpeed').value='0.25';page.get('scrollSpeed').oninput();
+  const event=legacy?{changedTouches:[{identifier:1}],preventDefault(){}}:{pointerId:1,button:0,preventDefault(){}};
+  const press=legacy?'touchstart':'pointerdown',release=legacy?'touchend':'pointerup';
   const up=page.get('scrollUp'),down=page.get('scrollDown');
-  up.handlers.pointerdown(event);await runTimer(page,16);
+  up.handlers[press](event);await runTimer(page,16);
   await runTimer(page,350);await runTimer(page,16);
-  await runTimer(page,60);await runTimer(page,16);
-  up.handlers.pointerup(event);
-  assert.deepEqual(scrollCommands(page).map(c=>c.y),[40,12,12]);
-  assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  await runTimer(page,16);await runTimer(page,16);
+  up.handlers[release](event);
+  assert.deepEqual(scrollCommands(page).map(c=>c.y),[10,120,120]);
+  assert.equal([...page.timers.values()].some(t=>[350,16].includes(t.ms)),false);
   // A synthetic click after the physical press must not duplicate the step.
   up.onclick({detail:1});assert.equal([...page.timers.values()].some(t=>t.ms===16),false);
   down.onclick({detail:0});await runTimer(page,16);
-  assert.equal(scrollCommands(page).at(-1).y,-40);
-  for(const reason of ['pointercancel','lostpointercapture']) {
-    down.handlers.pointerdown(event);await runTimer(page,16);down.handlers[reason](event);
-    assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  assert.equal(scrollCommands(page).at(-1).y,-10);
+  down.handlers[press](event);await runTimer(page,16);
+  await runTimer(page,350);await runTimer(page,16);
+  down.handlers[release](event);
+  assert.equal(scrollCommands(page).at(-1).y,-120);
+  for(const reason of legacy?['touchcancel']:['pointercancel','lostpointercapture']) {
+    down.handlers[press](event);await runTimer(page,16);down.handlers[reason](event);
+    assert.equal([...page.timers.values()].some(t=>[350,16].includes(t.ms)),false);
   }
+  assert.equal(loadMovement(page.storage).scrollSpeed,.25,'holding must not overwrite the saved speed');
+});
+test('held scrolling never queues a backlog while a command is in flight',async()=>{
+  let release;
+  const gate=new Promise(resolve=>release=resolve);
+  const page=browserHarness({saved:true,commandGate:()=>gate});await settle();
+  const arrow=page.get('scrollUp'),event={pointerId:1,button:0,preventDefault(){}};
+  arrow.handlers.pointerdown(event);await runTimer(page,16);
+  await runTimer(page,350);
+  for(let tick=0;tick<5;tick++)await runTimer(page,16);
+  assert.equal(page.calls.filter(call=>call.path==='/api/commands').length,1);
+  arrow.handlers.pointerup(event);
+  release();await settle();
+  assert.deepEqual(scrollCommands(page),[{type:'scroll',x:0,y:40}]);
+  assert.equal([...page.timers.values()].some(t=>[350,16].includes(t.ms)),false);
 });
 test('held legacy scroll stops when hidden, opening a dialog, or losing permission',async()=>{
   const page=browserHarness({saved:true,legacy:true});await settle();
@@ -399,14 +421,14 @@ test('held legacy scroll stops when hidden, opening a dialog, or losing permissi
   arrow.handlers.touchstart(event);await runTimer(page,16);
   page.document.hidden=true;page.listeners.visibilitychange();
   assert.equal(arrow.disabled,true);
-  assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  assert.equal([...page.timers.values()].some(t=>[350,16].includes(t.ms)),false);
   page.document.hidden=false;page.listeners.visibilitychange();await settle();
   arrow.handlers.touchstart(event);await runTimer(page,16);page.get('settings').onclick();
-  assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  assert.equal([...page.timers.values()].some(t=>[350,16].includes(t.ms)),false);
   page.get('settingsDone').onclick();
   arrow.handlers.touchstart(event);await runTimer(page,16);page.setState('permission');await runTimer(page,2000);
   assert.equal(arrow.disabled,true);
-  assert.equal([...page.timers.values()].some(t=>[350,60].includes(t.ms)),false);
+  assert.equal([...page.timers.values()].some(t=>[350,16].includes(t.ms)),false);
   const count=scrollCommands(page).length;
   arrow.handlers.touchstart(event);await settle();
   assert.equal(scrollCommands(page).length,count);

@@ -17,8 +17,8 @@ The QR code and eight-digit connection code remain available while other phones 
 ## Remote controls
 
 - **Trackpad:** slide with one finger to move; tap to click; double-tap to double-click. Tap with two fingers to right-click, or slide two fingers to scroll.
-- **Scroll strip:** drag the right edge vertically. Tap its arrows for a small scroll step or hold to keep scrolling.
-- **Playback row:** left and right arrow keys, with a play/pause button between them. Play/pause sends the Mac's system media key to the active media app.
+- **Scroll buttons:** the right edge has separate up/down buttons. Tap for a small scroll step, or hold for continuous scrolling at maximum speed. Release to stop. Holding uses the maximum speed regardless of the saved Scroll speed setting.
+- **Playback row:** full-width left, play/pause, and right buttons in a 2:1:2 width ratio. Play/pause sends the Mac's system media key to the active media app.
 - **Search:** select the destination text field on the Mac, then type in the remote's inline search field. Choose **Search** on the phone keyboard or beside the field to send the text and Return together. Backspace, Enter, and Esc are available below it. Search and trackpad stay on the same page.
 - **Top row:** Help, movement settings, mute, volume down, and volume up. Digital audio outputs such as HDMI may require the TV's own volume controls.
 - **Movement settings:** pointer speed, acceleration, smoothing, and scroll speed are saved on the phone.
