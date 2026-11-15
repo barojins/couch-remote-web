@@ -65,11 +65,12 @@ final class InputController {
             }
             if !units.isEmpty { postText(units) }
         case let .key(key):
-            // Use the same system media events as the Mac's volume keys.
+            // Use the same system events as the Mac's media keys, independent
+            // of the focused text field or button.
             // Digital outputs such as HDMI may expose no adjustable volume.
             let mediaKeys: [RemoteKey: Int32] = [
                 .volumeDown: NX_KEYTYPE_SOUND_DOWN, .mute: NX_KEYTYPE_MUTE,
-                .volumeUp: NX_KEYTYPE_SOUND_UP
+                .volumeUp: NX_KEYTYPE_SOUND_UP, .playPause: NX_KEYTYPE_PLAY
             ]
             if let mediaKey = mediaKeys[key] {
                 for state in [0xA, 0xB] {

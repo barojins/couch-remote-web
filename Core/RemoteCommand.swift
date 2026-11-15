@@ -2,7 +2,7 @@ import Foundation
 
 enum RemoteKey: String, CaseIterable, Codable {
     case returnKey, backspace, escape, space, left, right, up, down, tab
-    case volumeDown, mute, volumeUp
+    case volumeDown, mute, volumeUp, playPause
 }
 enum RemoteCommand: Equatable {
     case move(Int16, Int16), scroll(Int16, Int16)

@@ -25,29 +25,31 @@ architectures="$(lipo -archs "$app_path/Contents/MacOS/CouchRemoteWeb")"
 [[ " $architectures " == *" arm64 "* && " $architectures " == *" x86_64 "* ]]
 ditto "$app_path" "$staging_path/CouchRemoteWeb.app"
 ln -s /Applications "$staging_path/Applications"
-cat > "$staging_path/설치 안내.txt" <<'EOF'
+cat > "$staging_path/Installation.txt" <<'EOF'
 Couch Remote Web — Mac + iPhone Safari
 
-지원: macOS 13 이상, Intel 또는 Apple Silicon Mac.
-1. CouchRemoteWeb 앱을 Applications 폴더로 드래그하세요.
-2. Mac과 iPhone을 같은 신뢰할 수 있는 Wi-Fi에 연결하세요.
-3. 앱을 열고 Accessibility 권한을 허용한 뒤 Start receiver를 누르세요.
-4. iPhone 카메라로 QR 코드를 스캔하고 Safari에서 여세요.
-5. Safari에서 바로 쓸 때는 두 코드를 비교하고 Trust this phone을 누르세요.
-6. Safari의 공유 메뉴 → 홈 화면에 추가 → 웹 앱으로 열기를 켜세요.
-   홈 화면 앱에서 처음 실행할 때 Mac의 First-time connection code
-   8자리를 입력하고 코드를 비교한 뒤 Trust this phone을 누르세요.
-   다음부터 저장된 승인으로 자동 재연결됩니다.
-   이전 IP 주소 바로가기는 새 .local 주소의 QR로 한 번 다시 추가하세요.
-7. Mac에서 Launch at login을 켜면 로그인할 때 수신기를 실행합니다.
-   Trusted phones의 Forget으로 승인한 휴대폰을 철회할 수 있습니다.
+Requires macOS 13 or later on an Intel or Apple Silicon Mac.
+1. Drag CouchRemoteWeb to Applications.
+2. Connect the Mac and iPhone to the same trusted private Wi-Fi network.
+3. Open the Mac app, grant Accessibility access, and choose Start receiver.
+4. Scan the QR code with the iPhone camera and open it in Safari.
+5. Compare the approval codes, then choose Trust this phone on the Mac.
+   Approve each phone separately; multiple phones can remain connected.
+6. For a full-screen remote, use Safari > Share > Add to Home Screen.
+   Open the Home Screen icon and enter the Mac's 8-digit Connection code.
+   Compare the approval codes and choose Trust this phone once.
+   Future visits reconnect automatically using the saved approval.
+   Replace old IP-address shortcuts with the current .local QR link.
+7. Enable Launch at login to start the receiver when you sign in.
+   Use Forget under Connected devices to revoke a phone's approval.
 
-iPhone 앱 설치나 개발자 멤버십은 필요하지 않습니다.
-연결은 HTTP이며 암호화되지 않습니다. 개인용 신뢰 Wi-Fi에서만 사용하고
-암호나 민감한 내용을 입력하지 마세요. 인터넷에 포트를 개방하지 마세요.
+No iPhone app, Xcode, or developer membership is needed on the phone.
+The connection uses unencrypted HTTP. Use trusted private Wi-Fi only.
+Do not enter passwords or sensitive text, and do not forward the receiver
+port to the internet.
 
-이 개인 테스트용 설치 파일은 Apple 공증을 받지 않았으므로
-macOS에서 차단할 수 있습니다. 파일 출처를 확인하고 Apple 안내를 참고하세요.
+The default personal test build is ad-hoc signed and is not Apple-notarized.
+macOS may block its first launch. Verify the source and follow Apple's guidance:
 https://support.apple.com/102445
 EOF
 

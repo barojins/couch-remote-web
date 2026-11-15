@@ -1,0 +1,165 @@
+name: Publish Mac release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - project.yml
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mac-release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Read release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(ruby -ryaml -e 'puts YAML.load_file("project.yml").fetch("settings").fetch("base").fetch("MARKETING_VERSION")')"
+          build="$(ruby -ryaml -e 'puts YAML.load_file("project.yml").fetch("settings").fetch("base").fetch("CURRENT_PROJECT_VERSION")')"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$build" =~ ^[0-9]+$ ]]
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+            echo "Release v$version already exists; no files will be replaced." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.version.outputs.exists == 'false'
+        with:
+          node-version: '22'
+      - name: Test and package universal Mac app
+        if: steps.version.outputs.exists == 'false'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BUILD: ${{ steps.version.outputs.build }}
+        run: |
+          set -euo pipefail
+          swift test
+          npm test
+          for script in Scripts/*.sh; do bash -n "$script"; done
+          bash Scripts/PackageMac.sh
+          info=build/distribution/Build/Products/Release/CouchRemoteWeb.app/Contents/Info.plist
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$info")" == "$RELEASE_VERSION" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$info")" == "$RELEASE_BUILD" ]]
+          (cd dist && shasum -a 256 CouchRemoteWeb-macOS13-universal.dmg > SHA256SUMS.txt)
+      - name: Prepare signed updater feed when the existing signing key is available
+        if: steps.version.outputs.exists == 'false'
+        id: signing
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SPARKLE_PRIVATE_KEY" ]]; then
+            echo 'signed=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::SPARKLE_PRIVATE_KEY is unavailable. This release will be available for manual download; the existing signed update feed will remain unchanged.'
+            exit 0
+          fi
+          tools="$RUNNER_TEMP/sparkle-tools"
+          stage="$RUNNER_TEMP/sparkle-feed"
+          key_file="$RUNNER_TEMP/sparkle-private-key"
+          signing_log="$RUNNER_TEMP/sparkle-signing.log"
+          trap 'rm -f "$key_file" "$signing_log"' EXIT
+          mkdir -p "$tools" "$stage"
+          umask 077
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$key_file"
+          curl --fail --location --retry 3 -o "$RUNNER_TEMP/Sparkle.tar.xz" https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz
+          tar -xJf "$RUNNER_TEMP/Sparkle.tar.xz" -C "$tools"
+          cp dist/CouchRemoteWeb-macOS13-universal.dmg "$stage/"
+          if ! "$tools/bin/generate_appcast" --ed-key-file "$key_file" --maximum-deltas 0 --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/" -o "$stage/appcast.xml" "$stage" > "$signing_log" 2>&1; then
+            echo '::error::Sparkle feed generation failed. No release or feed was published.'
+            exit 1
+          fi
+          if ! "$tools/bin/sign_update" --ed-key-file "$key_file" --verify "$stage/appcast.xml" >> "$signing_log" 2>&1; then
+            echo '::error::Sparkle feed signature verification failed. No release or feed was published.'
+            exit 1
+          fi
+          # Reject a different signing key instead of publishing an update that
+          # existing installed apps cannot authenticate.
+          cat > "$RUNNER_TEMP/verify-sparkle.swift" <<'SWIFT'
+          import Foundation
+          #if canImport(FoundationXML)
+          import FoundationXML
+          #endif
+          import CryptoKit
+          final class Feed: NSObject, XMLParserDelegate {
+              var signature: String?
+              func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
+                  if name == "enclosure" { signature = attributes["sparkle:edSignature"] }
+              }
+          }
+          let args = CommandLine.arguments
+          let plist = try PropertyListSerialization.propertyList(from: Data(contentsOf: URL(fileURLWithPath: args[1])), format: nil) as! [String: Any]
+          let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: Data(base64Encoded: plist["SUPublicEDKey"] as! String)!)
+          let feed = Feed(), parser = XMLParser(data: try Data(contentsOf: URL(fileURLWithPath: args[2])))
+          parser.delegate = feed
+          guard parser.parse(), let encoded = feed.signature, let signature = Data(base64Encoded: encoded),
+                publicKey.isValidSignature(signature, for: try Data(contentsOf: URL(fileURLWithPath: args[3]))) else {
+              fputs("The update archive is not signed by the installed app's Sparkle key.\n", stderr)
+              exit(1)
+          }
+          SWIFT
+          swift "$RUNNER_TEMP/verify-sparkle.swift" build/distribution/Build/Products/Release/CouchRemoteWeb.app/Contents/Info.plist "$stage/appcast.xml" dist/CouchRemoteWeb-macOS13-universal.dmg
+          cp "$stage/appcast.xml" Updates/appcast.xml
+          echo 'signed=true' >> "$GITHUB_OUTPUT"
+      - name: Retain verified installer
+        if: steps.version.outputs.exists == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CouchRemoteWeb-${{ steps.version.outputs.version }}-macOS13-universal
+          path: |
+            dist/CouchRemoteWeb-macOS13-universal.dmg
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+      - name: Publish installer release
+        if: steps.version.outputs.exists == 'false'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          SIGNED_UPDATE: ${{ steps.signing.outputs.signed }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/release-notes.md"
+          if [[ -f Docs/RELEASE_NOTES.md ]]; then
+            cp Docs/RELEASE_NOTES.md "$notes"
+          else
+            printf 'English TV remote controls, simultaneous devices, and connection recovery fixes.\n' > "$notes"
+          fi
+          if [[ "$SIGNED_UPDATE" != 'true' ]]; then
+            printf '\nInstall this release manually by replacing the app in Applications. The existing Sparkle signing key was unavailable to this build, so Check for Updates will continue to use the previous signed feed.\n' >> "$notes"
+          fi
+          printf '\nRequires macOS 13 or later; Intel and Apple Silicon. This personal test build is ad-hoc signed and is not Apple-notarized.\n' >> "$notes"
+          gh release create "$RELEASE_TAG" dist/CouchRemoteWeb-macOS13-universal.dmg dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Couch Remote Web $RELEASE_VERSION" --notes-file "$notes" --prerelease
+          echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish signed feed after the installer is available
+        if: steps.version.outputs.exists == 'false' && steps.signing.outputs.signed == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Updates/appcast.xml
+          git commit -m 'Publish signed update feed for build ${{ steps.version.outputs.build }}'
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo 'The signed feed now advertises this release to Check for Updates.' >> "$GITHUB_STEP_SUMMARY"

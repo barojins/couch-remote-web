@@ -6,15 +6,19 @@ import SystemConfiguration
 final class WebHost: ObservableObject {
     @Published private(set) var message = "Start the receiver to connect your iPhone."
     @Published private(set) var url = ""
-    @Published private(set) var approvalCode: String?
+    @Published private(set) var pendingDevices: [PendingWebDevice] = []
     @Published private(set) var entryCode = ""
     @Published private(set) var hasPermission = false
     @Published private(set) var isRunning = false
-    @Published private(set) var isApproved = false
     @Published private(set) var trustedDevices: [TrustedWebDevice] = []
-    @Published private(set) var connectedDeviceID: UUID?
-    @Published private(set) var pendingDeviceName = "Phone"
-    @Published var address = ""
+    @Published private(set) var connectedDeviceIDs: Set<UUID> = []
+    @Published var address = "" {
+        didSet {
+            guard !updatingAddress,
+                  networkSelection.select(address, from: Self.localNetworkAddresses()) != nil else { return }
+            saveNetworkSelection()
+        }
+    }
     @Published private(set) var addresses: [String] = []
     var onApproval: (() -> Void)?
     private var listener: NWListener?
@@ -23,6 +27,8 @@ final class WebHost: ObservableObject {
     private let input = InputController()
     private var timer: Timer?
     private var networkTicks = 0
+    private var networkSelection = NetworkSelection()
+    private var updatingAddress = false
 
     init() {
         if let saved = UserDefaults.standard.data(forKey: "trustedWebDevices"),
@@ -30,16 +36,23 @@ final class WebHost: ObservableObject {
             api.session.trustedDevices = devices
             trustedDevices = devices
         }
+        networkSelection = NetworkSelection(preferredInterface: UserDefaults.standard.string(forKey: "receiverInterface"))
         refreshAddresses()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.api.session.expire()
             self.networkTicks += 1
             if self.networkTicks % 5 == 0, UserDefaults.standard.bool(forKey: "receiverEnabled") {
-                let available = Self.localAddresses()
-                if self.listener == nil || !available.contains(self.address) {
-                    self.refreshAddresses()
-                    if !self.address.isEmpty { self.start() }
+                let available = Self.localNetworkAddresses()
+                let selected = self.networkSelection.resolve(available, currentAddress: self.address)
+                if self.listener == nil || selected?.address != self.address {
+                    self.refreshAddresses(available)
+                    if !self.address.isEmpty {
+                        self.start()
+                    } else {
+                        if self.listener != nil { self.stop(keepEnabled: true) }
+                        self.message = "Waiting for the selected network. Reconnect it or choose another network."
+                    }
                 }
             }
             if self.isRunning { self.publish() }
@@ -48,17 +61,26 @@ final class WebHost: ObservableObject {
         hasPermission = input.hasPermission
         if UserDefaults.standard.bool(forKey: "receiverEnabled") { start() }
     }
-    func refreshAddresses() {
-        addresses = Self.localAddresses()
-        if !addresses.contains(address) { address = addresses.first ?? "" }
+    func refreshAddresses() { refreshAddresses(Self.localNetworkAddresses()) }
+    private func refreshAddresses(_ available: [LocalNetworkAddress]) {
+        addresses = Array(Set(available.map(\.address))).sorted()
+        updatingAddress = true
+        defer { updatingAddress = false }
+        address = networkSelection.resolve(available, currentAddress: address)?.address ?? ""
+    }
+    private func saveNetworkSelection() {
+        UserDefaults.standard.set(networkSelection.preferredInterface, forKey: "receiverInterface")
     }
     func start() {
         stop(keepEnabled: true)
         UserDefaults.standard.set(true, forKey: "receiverEnabled")
-        guard !address.isEmpty, Self.localAddresses().contains(address) else {
-            message = "Connect this Mac to your private Wi-Fi network, then refresh."
+        let available = Self.localNetworkAddresses()
+        guard !address.isEmpty, networkSelection.select(address, from: available) != nil else {
+            refreshAddresses(available)
+            message = "Waiting for the selected network. Reconnect it or choose another network."
             return
         }
+        saveNetworkSelection()
         do {
             let parameters = NWParameters.tcp
             let savedPort = UserDefaults.standard.integer(forKey: "receiverPort")
@@ -102,18 +124,21 @@ final class WebHost: ObservableObject {
         url = ""
         publish()
     }
-    func disconnect() {
-        api.session.revoke()
-        input.resetPointer()
+    func decline(_ client: String) {
+        api.session.decline(client)
         updateURL()
         publish()
     }
-    func approve() { api.session.approve(); saveTrust(); publish() }
+    func newConnectionLink() {
+        api.session.rotateLink()
+        updateURL()
+        publish()
+    }
+    func approve(_ client: String) { api.session.approve(client); saveTrust(); publish() }
     func renameDevice(_ id: UUID, name: String) { api.session.renameDevice(id, name: name); saveTrust(); publish() }
     func forgetDevice(_ id: UUID) {
         api.session.forgetDevice(id)
         saveTrust()
-        input.resetPointer()
         updateURL()
         publish()
     }
@@ -127,12 +152,19 @@ final class WebHost: ObservableObject {
     private func updateURL() { url = isRunning ? "http://\(api.authority)/#\(api.session.token)" : "" }
     private func publish() {
         hasPermission = input.hasPermission
-        approvalCode = api.session.code
+        pendingDevices = api.session.pendingDevices
         entryCode = api.session.entryCode
-        isApproved = api.session.approved
-        connectedDeviceID = api.session.activeDeviceID
-        pendingDeviceName = api.session.pendingDeviceName
-        message = !isRunning ? "Receiver stopped" : approvalCode != nil ? "Compare the code on your iPhone before allowing control." : isApproved ? "iPhone connected" : trustedDevices.isEmpty ? "Scan the QR code with your iPhone." : "Ready for your trusted phone. Open Couch Remote on your iPhone."
+        connectedDeviceIDs = api.session.activeDeviceIDs
+        if !isRunning {
+            message = "Receiver stopped"
+        } else if !pendingDevices.isEmpty {
+            message = "Compare each phone’s code before allowing control."
+        } else if !connectedDeviceIDs.isEmpty {
+            let count = connectedDeviceIDs.count
+            message = "\(count) \(count == 1 ? "phone connected" : "phones connected"). Scan the QR code to add another."
+        } else {
+            message = "Scan the QR code or open Couch Remote on a trusted phone."
+        }
     }
     private func accept(_ connection: NWConnection) {
         guard isRunning, connections.count < 32 else { connection.cancel(); return }
@@ -152,19 +184,20 @@ final class WebHost: ObservableObject {
                   let data = try? Data(contentsOf: directory.appendingPathComponent(name)) else { return HTTPResponse(404, json: ["error": "Not found."]) }
             return HTTPResponse(data: data, contentType: type)
         }
-        let previousCode = api.session.code
+        let previousCodes = Dictionary(uniqueKeysWithValues: api.session.pendingDevices.map { ($0.id, $0.code) })
         let response = api.handle(request, hasPermission: input.hasPermission) { [input] commands in
             commands.forEach { input.execute($0) }
         }
         publish()
-        if approvalCode != nil && approvalCode != previousCode { onApproval?() }
+        if pendingDevices.contains(where: { previousCodes[$0.id] != $0.code }) { onApproval?() }
         return response
     }
-    static func localAddresses() -> [String] {
+    static func localAddresses() -> [String] { Array(Set(localNetworkAddresses().map(\.address))).sorted() }
+    static func localNetworkAddresses() -> [LocalNetworkAddress] {
         var first: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&first) == 0 else { return [] }
         defer { freeifaddrs(first) }
-        var result: Set<String> = [], entry = first
+        var result: Set<LocalNetworkAddress> = [], entry = first
         while let item = entry {
             defer { entry = item.pointee.ifa_next }
             guard let addr = item.pointee.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET),
@@ -174,9 +207,9 @@ final class WebHost: ObservableObject {
             guard getnameinfo(addr, socklen_t(addr.pointee.sa_len), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
             let value = String(cString: host), parts = value.split(separator: ".").compactMap { Int($0) }
             guard parts.count == 4, parts[0] == 10 || (parts[0] == 192 && parts[1] == 168) || (parts[0] == 172 && (16...31).contains(parts[1])) else { continue }
-            result.insert(value)
+            result.insert(LocalNetworkAddress(interface: String(cString: item.pointee.ifa_name), address: value))
         }
-        return result.sorted()
+        return result.sorted { $0.address == $1.address ? $0.interface < $1.interface : $0.address < $1.address }
     }
 }
 

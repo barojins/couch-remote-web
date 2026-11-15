@@ -14,12 +14,13 @@
 </head>
 <body>
   <main id="main">
-    <header><div class="tools"><button id="help" class="icon" aria-label="Help" title="Help">?</button><button id="settings" class="icon" aria-label="Movement settings" title="Movement settings">⚙</button></div><button id="keyboard" disabled><span aria-hidden="true">⌨</span> Keyboard</button></header>
-    <div id="volume" role="group" aria-label="Mac volume">
-      <button data-key="mute" aria-label="Mute or unmute" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="m16 9 6 6m0-6-6 6"/></svg></button>
-      <button data-key="volumeDown" aria-label="Volume down" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M16 12h6"/></svg></button>
-      <button data-key="volumeUp" aria-label="Volume up" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M16 12h6m-3-3v6"/></svg></button>
-    </div>
+    <header aria-label="Remote controls">
+      <button id="help" class="icon" aria-label="Help" title="Help">?</button>
+      <button id="settings" class="icon" aria-label="Movement settings" title="Movement settings">⚙</button>
+      <button data-key="mute" aria-label="Mute or unmute" title="Mute" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="m16 9 6 6m0-6-6 6"/></svg></button>
+      <button data-key="volumeDown" aria-label="Volume down" title="Volume down" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M16 12h6"/></svg></button>
+      <button data-key="volumeUp" aria-label="Volume up" title="Volume up" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M16 12h6m-3-3v6"/></svg></button>
+    </header>
     <form id="deviceSetup" hidden>
       <label for="deviceName">Device name</label>
       <div class="entry-row"><input id="deviceName" type="text" maxlength="40" placeholder="e.g. iPhone 5s" autocomplete="off" required><button type="submit">Continue</button></div>
@@ -28,7 +29,7 @@
       <label for="entryCode">Mac connection code</label>
       <div class="entry-row"><input id="entryCode" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{8}" maxlength="8" placeholder="8 digits" required><button id="pairButton" type="submit">Connect</button></div>
     </form>
-    <section id="pairing" hidden><div id="code"></div><p>Awaiting approval</p></section>
+    <section id="pairing" hidden><div id="code"></div><p id="pairingStatus" role="timer" aria-live="off">Awaiting approval</p></section>
     <div id="padArea">
       <div id="trackpad" role="application" aria-label="Mac trackpad: slide to move, tap to click, two-finger tap to right-click, two fingers to scroll" tabindex="0"></div>
       <div id="scrollRail" role="group" aria-label="Vertical scrolling">
@@ -37,6 +38,22 @@
         <button id="scrollDown" aria-label="Scroll down: tap or hold" disabled>▼</button>
       </div>
     </div>
+    <div id="navigation" role="group" aria-label="Playback controls">
+      <button id="navLeft" data-key="left" aria-label="Left arrow" disabled>←</button>
+      <button id="playPause" data-key="playPause" aria-label="Play or pause video" title="Play / pause" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5v14l9-7L2 5Zm12 0h3v14h-3V5Zm6 0h3v14h-3V5Z"/></svg></button>
+      <button id="navRight" data-key="right" aria-label="Right arrow" disabled>→</button>
+    </div>
+    <section id="searchArea" aria-label="Search on your Mac">
+      <form id="composer" role="search">
+        <input id="text" type="search" enterkeyhint="search" placeholder="Search on your Mac…" aria-label="Search on your Mac" maxlength="4096" autocomplete="off" autocapitalize="none" spellcheck="false" disabled>
+        <button id="send" type="submit" aria-label="Search" disabled>Search</button>
+      </form>
+      <div id="keys" role="group" aria-label="Keyboard shortcuts">
+        <button data-key="backspace" aria-label="Backspace" disabled>⌫</button>
+        <button data-key="returnKey" disabled>Enter</button>
+        <button data-key="escape" disabled>Esc</button>
+      </div>
+    </section>
     <footer><button id="connect" hidden>Reconnect</button><p id="status" role="status">Connecting…</p></footer>
   </main>
   <dialog id="settingsDialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -54,17 +71,11 @@
   </dialog>
   <dialog id="helpDialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <div class="dialog-heading"><h2 id="helpTitle">Help</h2><button id="helpDone" class="quiet">Done</button></div>
-    <details><summary>Connect</summary><p>Keep the Mac awake and both devices on the same private Wi-Fi. Scan the Mac’s QR code or enter its 8-digit connection code. Compare the approval codes, then choose Trust this phone on the Mac.</p></details>
-    <details><summary>Trackpad and keyboard</summary><p>Slide to move, tap to click, double-tap to double-click. Tap with two fingers to right-click, or slide two fingers to scroll. Drag the right-edge strip to scroll with one finger. Tap its arrows for a small step, or hold to keep scrolling. Adjust Scroll speed in Movement settings. For typing, select a text field on the Mac, then open Keyboard.</p></details>
+    <details><summary>Connect</summary><p>Keep the Mac awake and all devices on the same private Wi-Fi. Scan the Mac’s QR code or enter its 8-digit connection code. Compare the approval codes, then choose Trust this phone on the Mac. Multiple phones can stay connected; approve each new phone separately.</p></details>
+    <details><summary>Trackpad and keyboard</summary><p>Slide to move, tap to click, double-tap to double-click. Tap with two fingers to right-click, or slide two fingers to scroll. Drag the right-edge strip to scroll with one finger. Tap its arrows for a small step, or hold to keep scrolling. Adjust Scroll speed in Movement settings. Below the trackpad, use the left/right keys to navigate and the middle button to play or pause the Mac’s active media app. For search, first select the search field on your Mac with the trackpad. Type in the search box on this page, then tap Search or your phone’s Search key. This sends the text followed by Enter; it does not read or replace existing text on the Mac. Your phone’s own keyboard opens when you tap the box.</p></details>
     <details><summary>Use without Safari’s toolbar</summary><p>In Safari, choose Share → Add to Home Screen. Open that icon and approve it once on the Mac.</p></details>
     <details><summary>Volume</summary><p>These buttons control the Mac’s volume keys. HDMI audio may require the TV’s own volume controls.</p></details>
     <details><summary>Privacy</summary><p>This remote uses local HTTP. Use trusted private Wi-Fi only; avoid sending passwords or sensitive text and never forward the receiver port to the internet.</p></details>
-  </dialog>
-  <dialog id="keyboardDialog" role="dialog" aria-modal="true" aria-labelledby="keyboardTitle">
-    <div class="dialog-heading"><h2 id="keyboardTitle">Keyboard</h2><button id="done" class="quiet">Done</button></div>
-    <form id="composer"><textarea id="text" rows="1" placeholder="Type…" aria-label="Text to send" maxlength="4096"></textarea><button id="send" aria-label="Send text" disabled>↑</button></form>
-    <div id="keys"><button data-key="returnKey">Return</button><button data-key="backspace" aria-label="Backspace">⌫</button><button data-key="escape">Esc</button><button data-key="space">Space</button><button data-key="tab">Tab</button><button data-key="up" aria-label="Up arrow">↑</button><button data-key="left" aria-label="Left arrow">←</button><button data-key="down" aria-label="Down arrow">↓</button><button data-key="right" aria-label="Right arrow">→</button></div>
-    <p id="keyboardStatus" role="status"></p>
   </dialog>
 </body>
 </html>

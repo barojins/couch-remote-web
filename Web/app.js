@@ -14,19 +14,22 @@ random[6] = (random[6] & 15) | 64; random[8] = (random[8] & 63) | 128;
 const hex = [...random].map(x=>x.toString(16).padStart(2,'0')).join('');
 const client = (saved && saved.client) || `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 let ready=false, active=false, queue=[], sending=false, polling=null, frame=null, tapTimer=null, lastTap=0, textBusy=false, generation=0;
-let retryTimer=null, attempts=0, connecting=false;
+let retryTimer=null, attempts=0, connecting=false, pairingAttempt=null;
+let approvalExpired=false, retryingApproval=false, approvalTimer=null, approvalDeadline=null, textRequest=null, textWarning='', composing=false;
 let tuning=loadMovement(storage);
 let scrollContact=null, scrollTimer=null, scrollFraction=0;
 const gesture = new Gesture(tuning);
-function setMessage(text) { $('status').textContent=text; $('keyboardStatus').textContent=text; }
+function setMessage(text) { $('status').textContent=text; }
 function controls() {
-  $('trackpad').classList.toggle('ready',ready); $('keyboard').disabled=!ready;
+  $('main').classList.toggle('connected',ready);
+  $('trackpad').classList.toggle('ready',ready);
   $('scrollRail').classList.toggle('ready',ready && !textBusy);
   $('scrollUp').disabled=$('scrollDown').disabled=!ready || textBusy;
   $('scrollDrag').setAttribute('aria-disabled',String(!ready || textBusy));
   if(!ready || textBusy)cancelScroll();
   $('send').disabled=!ready || textBusy || !$('text').value;
-  $('text').disabled=textBusy; $('done').disabled=textBusy;
+  $('text').disabled=!ready || textBusy;
+  $('composer').setAttribute('aria-busy',String(textBusy));
   document.querySelectorAll('[data-key]').forEach(b=>b.disabled=!ready || textBusy);
 }
 async function api(path,body={}) {
@@ -34,7 +37,7 @@ async function api(path,body={}) {
   try {
     const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'X-Couch-Client':client},body:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
     const result=await response.json();
-    if(!response.ok) { const error=new Error(result.error || 'Connection failed.'); error.status=response.status; throw error; }
+    if(!response.ok) { const error=new Error(result.error || 'Connection failed.'); error.status=response.status; error.reason=result.reason; throw error; }
     return result;
   } finally { clearTimeout(timeout); }
 }
@@ -45,37 +48,60 @@ function apply(result) {
     saveConnection(storage,token,client);
   }
   ready=result.state==='ready';
+  approvalExpired=false;
+  retryingApproval=false;
   attempts=0;
   $('entry').hidden=true; $('pairing').hidden=result.state!=='pending'; $('code').textContent=result.code;
-  setMessage({ready:'Connected over Wi-Fi',pending:'Approve the code on your Mac.',permission:'Enable Accessibility access on your Mac.',disconnected:'Disconnected. Scan the Mac’s QR code again.'}[result.state] || 'Connecting…');
+  setMessage(result.state==='ready' && textWarning ? textWarning : {ready:'Connected over Wi-Fi',pending:'Approve the code on your Mac.',permission:'Enable Accessibility access on your Mac.',disconnected:'Disconnected. Scan the Mac’s QR code again.'}[result.state] || 'Connecting…');
+  clearTimeout(approvalTimer); approvalTimer=null;
+  approvalDeadline=result.state==='pending' && Number.isFinite(result.expiresIn) ? Date.now()+result.expiresIn*1000 : null;
+  if(approvalDeadline!==null)updateApprovalCountdown(generation);
   if(!ready) { queue=[]; gesture.reset(); }
   controls();
+}
+function updateApprovalCountdown(current) {
+  if(current!==generation || approvalDeadline===null)return;
+  const remaining=Math.max(0,Math.ceil((approvalDeadline-Date.now())/1000));
+  $('pairingStatus').textContent=`Approve on your Mac within ${remaining} seconds.`;
+  if(!remaining){expireApproval();return;}
+  approvalTimer=setTimeout(()=>updateApprovalCountdown(current),1000);
+}
+function expireApproval() {
+  stop('Approval expired. Choose Connect again to request a new code.');
+  approvalExpired=true;
+  retryingApproval=false;
+  $('connect').hidden=false; $('connect').textContent='Connect again'; $('entry').hidden=true;
 }
 function stop(message) {
   cancelScroll();
   generation++; connecting=false; clearTimeout(retryTimer); retryTimer=null; ready=false; active=false; queue=[]; gesture.reset();
-  clearTimeout(polling); clearTimeout(tapTimer); tapTimer=null; cancelAnimationFrame(frame); frame=null; textBusy=false;
-  $('pairing').hidden=true; $('entry').hidden=!!token; $('connect').hidden=!token; setMessage(message); controls();
+  clearTimeout(polling); clearTimeout(tapTimer); tapTimer=null; cancelAnimationFrame(frame); frame=null; textBusy=!!textRequest;
+  clearTimeout(approvalTimer); approvalTimer=null; approvalDeadline=null;
+  $('connect').textContent='Reconnect';
+  $('pairing').hidden=true; $('entry').hidden=!!token || !!pairingAttempt; $('connect').hidden=!token && !pairingAttempt; setMessage(message); controls();
 }
 function recover(message) {
   stop(message);
-  if(token && !document.hidden)retryTimer=setTimeout(connect,retryDelay(attempts++));
+  if((token || pairingAttempt) && !document.hidden && !approvalExpired)retryTimer=setTimeout(()=>connect(),retryDelay(attempts++));
 }
 async function poll() {
   if(!active) return;
   const current=generation;
-  try { const r=await api('/api/status'); if(current!==generation)return; apply(r); if(r.state==='disconnected'){recover('Reconnecting…');return;} }
-  catch { if(current===generation)recover('Waiting for your Mac… Reconnecting automatically.'); return; }
+  try { const r=await api('/api/status'); if(current!==generation)return; apply(r); if(current!==generation || !active)return; if(r.state==='disconnected'){recover('Reconnecting…');return;} }
+  catch(error) { if(current===generation){if(error.reason==='approvalExpired')expireApproval();else recover('Waiting for your Mac… Reconnecting automatically.');} return; }
   polling=setTimeout(poll,2000);
 }
-async function connect() {
+async function connect(retryApproval=false) {
   if(needsName){stop("Name this device to continue.");$("deviceSetup").hidden=false;$("entry").hidden=true;$("connect").hidden=true;return;}
   if(document.hidden || connecting || active)return;
+  if(approvalExpired && !retryApproval)return;
+  if(retryApproval && approvalExpired){approvalExpired=false;retryingApproval=true;}
+  if(!token && pairingAttempt)return pair(pairingAttempt,retryingApproval);
   if(!token) {stop('Enter the connection code shown on your Mac.');return;}
   stop('Connecting…'); connecting=true; const current=generation; $('connect').hidden=true;
   try {
     let result;
-    try { result=await api('/api/connect',{deviceName}); }
+    try { result=await api('/api/connect',{deviceName,...(retryingApproval?{retryApproval:true}:{})}); }
     catch(error) {
       if(current!==generation)return;
       if(error.status!==403)throw error;
@@ -87,6 +113,7 @@ async function connect() {
     connecting=false; active=true; apply(result); poll();
   } catch(error) {
     if(current!==generation)return;
+    if(error.reason==='approvalExpired'){expireApproval();return;}
     if(error.status===403) {
       forgetConnection(storage);
       if(qrToken && token!==qrToken) {
@@ -123,8 +150,10 @@ async function flush(){
 const pad=$('trackpad');
 function down(id,x,y,time) {
   gesture.down(id,x,y,time);
-  if(gesture.maxTouches===2){clearTimeout(tapTimer);tapTimer=null;}
+  if(gesture.maxTouches===2)flushTap();
 }
+function flushTap(){if(tapTimer){clearTimeout(tapTimer);tapTimer=null;enqueue({type:'click'});}}
+function movePointer(command){if(command){flushTap();enqueue(command);}}
 function up(id,time) {
   const kind=gesture.up(id,time);
   if(kind==='rightClick'){clearTimeout(tapTimer);tapTimer=null;enqueue({type:kind});}
@@ -136,7 +165,7 @@ function up(id,time) {
 function cancelGesture(){gesture.reset();clearTimeout(tapTimer);tapTimer=null;}
 if(typeof PointerEvent!=='undefined') {
   pad.addEventListener('pointerdown',e=>{if(!ready)return;e.preventDefault();pad.setPointerCapture(e.pointerId);down(e.pointerId,e.clientX,e.clientY,e.timeStamp);});
-  pad.addEventListener('pointermove',e=>{if(!ready)return;e.preventDefault();enqueue(gesture.move(e.pointerId,e.clientX,e.clientY,e.timeStamp));});
+  pad.addEventListener('pointermove',e=>{if(!ready)return;e.preventDefault();movePointer(gesture.move(e.pointerId,e.clientX,e.clientY,e.timeStamp));});
   pad.addEventListener('pointerup',e=>{if(!ready)return;e.preventDefault();up(e.pointerId,e.timeStamp);});
   pad.addEventListener('pointercancel',cancelGesture);
 } else {
@@ -146,14 +175,14 @@ if(typeof PointerEvent!=='undefined') {
     e.preventDefault();
     Array.from(e.changedTouches).forEach(t=>{
       if(name==='touchstart')down(t.identifier,t.clientX,t.clientY,e.timeStamp);
-      else if(name==='touchmove')enqueue(gesture.move(t.identifier,t.clientX,t.clientY,e.timeStamp));
+      else if(name==='touchmove')movePointer(gesture.move(t.identifier,t.clientX,t.clientY,e.timeStamp));
       else up(t.identifier,e.timeStamp);
     });
   },{passive:false}));
   pad.addEventListener('touchcancel',cancelGesture,{passive:false});
 }
 pad.addEventListener('contextmenu',e=>e.preventDefault());
-pad.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();enqueue({type:e.shiftKey?'rightClick':'click'});}});
+pad.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();flushTap();enqueue({type:e.shiftKey?'rightClick':'click'});}});
 function cancelScroll() {
   clearTimeout(scrollTimer); scrollTimer=null; scrollContact=null; scrollFraction=0;
 }
@@ -165,7 +194,7 @@ function scrollBy(amount) {
 }
 function startScroll(id,y,direction) {
   if(!ready || textBusy || scrollContact)return false;
-  cancelGesture();
+  flushTap();cancelGesture();
   scrollContact={id,y};
   if(direction) {
     scrollBy(direction*40);
@@ -221,7 +250,7 @@ function bindDialog(dialogID,openID,closeID,focusID) {
     $(openID).focus();
   }
   $(openID).onclick=()=>{
-    cancelGesture();cancelScroll();
+    flushTap();cancelGesture();cancelScroll();
     if(typeof dialog.showModal==='function')dialog.showModal();
     else {dialog.setAttribute('open','');$('main').setAttribute('aria-hidden','true');}
     $(focusID).focus();
@@ -238,7 +267,6 @@ function bindDialog(dialogID,openID,closeID,focusID) {
     }
   });
 }
-bindDialog('keyboardDialog','keyboard','done','text');
 bindDialog('settingsDialog','settings','settingsDone','sensitivity');
 bindDialog('helpDialog','help','helpDone','helpDone');
 function showTuning(){
@@ -254,18 +282,43 @@ function updateTuning(){
 ['sensitivity','acceleration','smoothing','scrollSpeed'].forEach(key=>$(key).oninput=()=>{tuning[key]=Number($(key).value);updateTuning();});
 $('resetMovement').onclick=()=>{tuning=Object.assign({},movementDefaults);updateTuning();};
 showTuning();
-$('keyboardDialog').addEventListener('cancel',e=>{if(textBusy)e.preventDefault();});
-$('text').oninput=()=>{$('text').style.height='auto';$('text').style.height=Math.min(160,$('text').scrollHeight)+'px';controls();};
-document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>enqueue({type:'key',key:b.dataset.key}));
+$('text').oninput=controls;
+$('text').addEventListener('compositionstart',()=>{composing=true;});
+$('text').addEventListener('compositionend',()=>{composing=false;});
+$('text').addEventListener('keydown',e=>{
+  if(e.key==='Enter' && (composing || e.isComposing || e.keyCode===229))e.preventDefault();
+});
+function updateViewport() {
+  const viewport=typeof visualViewport==='undefined'?null:visualViewport;
+  const height=viewport?viewport.height:innerHeight, top=viewport?viewport.offsetTop:0;
+  document.documentElement.style.setProperty('--remote-height',Math.round(height)+'px');
+  document.documentElement.style.setProperty('--remote-top',Math.round(top)+'px');
+  const focused=document.activeElement===$('text');
+  $('main').classList.toggle('keyboard-open',focused);
+  if(focused)requestAnimationFrame(()=>{
+    const rect=$('text').getBoundingClientRect();
+    if(rect.bottom>top+height || rect.top<top)$('text').scrollIntoView(false);
+  });
+}
+$('text').addEventListener('focus',()=>{flushTap();cancelGesture();cancelScroll();updateViewport();});
+$('text').addEventListener('blur',()=>{composing=false;updateViewport();});
+addEventListener('resize',updateViewport);
+if(typeof visualViewport!=='undefined' && visualViewport){visualViewport.addEventListener('resize',updateViewport);visualViewport.addEventListener('scroll',updateViewport);}
+updateViewport();
+document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>{flushTap();enqueue({type:'key',key:b.dataset.key});});
 $('composer').onsubmit=async e=>{
-  e.preventDefault(); if(!ready || textBusy || !$('text').value)return;
+  e.preventDefault(); if(composing || !ready || textBusy || !$('text').value)return;
   if(sending || queue.length){setMessage('Wait for the previous input to finish, then send.');return;}
   const text=$('text').value;
   if(new TextEncoder().encode(text).length>4096){setMessage('Send up to 4 KB at a time.');return;}
-  textBusy=true; controls(); const current=generation;
-  try{const r=await api('/api/commands',[{type:'text',text}]);if(current!==generation)return;$('text').value='';apply(r);}
-  catch(error){if(current===generation)recover(error.message+' Text may be partially sent; check the Mac before sending it again.');}
-  finally{textBusy=false;controls();}
+  const request={};textRequest=request;textWarning='';textBusy=true; controls(); const current=generation;
+  try{const r=await api('/api/commands',[{type:'text',text},{type:'key',key:'returnKey'}]);if(textRequest===request && $('text').value===text)$('text').value='';if(current!==generation)return;apply(r);}
+  catch(error){
+    textWarning=error.message+' Text may be partially sent; check the Mac before sending it again.';
+    if(current===generation)recover(textWarning);
+    else if(!document.hidden)setMessage(textWarning);
+  }
+  finally{if(textRequest===request){textRequest=null;textBusy=false;controls();}}
 };
 function suspend(){
   // Safari can freeze or kill this page. Release only local input state; the Mac
@@ -278,17 +331,28 @@ $('deviceSetup').onsubmit=e=>{
   try {storage.setItem('couch-remote-name',deviceName);} catch {}
   needsName=false;$('deviceSetup').hidden=true;connect();
 };
-$('connect').onclick=connect;
-$('entry').onsubmit=async e=>{
-  e.preventDefault(); const code=$('entryCode').value.trim();
-  if(!/^[0-9]{8}$/.test(code)){setMessage('Enter the 8-digit code shown on your Mac.');return;}
-  stop('Connecting…'); const current=generation; $('pairButton').disabled=true;
+$('connect').onclick=()=>connect(true);
+function newPairingSecret() {
+  return btoa(Array.from(crypto.getRandomValues(new Uint8Array(32)),value=>String.fromCharCode(value)).join('')).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function pair(attempt,retryApproval=false) {
+  stop('Connecting…');connecting=true;const current=generation; $('pairButton').disabled=true;
   try {
-    const result=await api('/api/pair',{code,deviceName});
+    const result=await api('/api/pair',{...attempt,deviceName,...(retryApproval?{retryApproval:true}:{})});
     if(current!==generation)return;
-    token=result.token; $('entryCode').value=''; active=true; apply(result); poll();
-  } catch(error){if(current===generation)stop(error.message);}
-  finally{$('pairButton').disabled=false;}
+    pairingAttempt=null;token=result.token; $('entryCode').value=''; connecting=false;active=true; apply(result); poll();
+  } catch(error){
+    if(current!==generation)return;
+    if(error.reason==='approvalExpired')expireApproval();
+    else if(error.status===403 || error.status===400 || error.status===429){pairingAttempt=null;stop(error.message);}
+    else recover('Connection interrupted. Retrying this pairing request…');
+  } finally{$('pairButton').disabled=false;}
+}
+$('entry').onsubmit=async e=>{
+  e.preventDefault();if(connecting)return; const code=$('entryCode').value.trim();
+  if(!/^[0-9]{8}$/.test(code)){setMessage('Enter the 8-digit code shown on your Mac.');return;}
+  pairingAttempt={code,pairingSecret:newPairingSecret()};approvalExpired=false;retryingApproval=false;
+  return pair(pairingAttempt);
 };
 addEventListener('pagehide',suspend);
 addEventListener('pageshow',()=>{if(!document.hidden)connect();});

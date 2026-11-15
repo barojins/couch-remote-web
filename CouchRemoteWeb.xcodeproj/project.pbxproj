@@ -13,6 +13,7 @@
 		2CDAFCEA1247AE8F584AFA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0DC987C9C28A81CE0A151C8B /* Assets.xcassets */; };
 		3418DA6B76EF505303A4D308 /* SoftwareUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8B42714435FD8BDE0077D9 /* SoftwareUpdates.swift */; };
 		5D20EBC2758883EEEDC083D6 /* LoginItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F9078E064ADBC50E902103D /* LoginItem.swift */; };
+		6126C63DF197A4F9133B614A /* NetworkSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF0EB24DA0E4B01A84C5537 /* NetworkSelection.swift */; };
 		7FCAA06FBDDE6A912CFFFDBF /* RemoteSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70681C8DE6B1B6DD10431C37 /* RemoteSession.swift */; };
 		846A19860FD2EF3A8734AF40 /* CouchRemoteWebApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6AEED6833A5AC52304CEDC /* CouchRemoteWebApp.swift */; };
 		B384279493761D4EC0E58A56 /* RemoteCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FE11476DD27D193B95FFC4 /* RemoteCommand.swift */; };
@@ -31,6 +32,7 @@
 		70681C8DE6B1B6DD10431C37 /* RemoteSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteSession.swift; sourceTree = "<group>"; };
 		8E819F590897355539F9CF08 /* CouchRemoteWeb.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CouchRemoteWeb.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB8B42714435FD8BDE0077D9 /* SoftwareUpdates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoftwareUpdates.swift; sourceTree = "<group>"; };
+		ADF0EB24DA0E4B01A84C5537 /* NetworkSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSelection.swift; sourceTree = "<group>"; };
 		E3FE11476DD27D193B95FFC4 /* RemoteCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteCommand.swift; sourceTree = "<group>"; };
 		F016984848509B0F470F477A /* WebHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebHost.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -51,6 +53,7 @@
 			isa = PBXGroup;
 			children = (
 				13EE188C9084287AE0AE0EBA /* HTTP.swift */,
+				ADF0EB24DA0E4B01A84C5537 /* NetworkSelection.swift */,
 				E3FE11476DD27D193B95FFC4 /* RemoteCommand.swift */,
 				70681C8DE6B1B6DD10431C37 /* RemoteSession.swift */,
 			);
@@ -169,6 +172,7 @@
 				046469EA86870B84DC1F917F /* HTTP.swift in Sources */,
 				B4DBA97F2C2C11D29BB5491B /* InputController.swift in Sources */,
 				5D20EBC2758883EEEDC083D6 /* LoginItem.swift in Sources */,
+				6126C63DF197A4F9133B614A /* NetworkSelection.swift in Sources */,
 				B384279493761D4EC0E58A56 /* RemoteCommand.swift in Sources */,
 				7FCAA06FBDDE6A912CFFFDBF /* RemoteSession.swift in Sources */,
 				3418DA6B76EF505303A4D308 /* SoftwareUpdates.swift in Sources */,
@@ -214,7 +218,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -227,7 +231,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.9;
+				MARKETING_VERSION = 1.0.10;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -273,7 +277,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -292,7 +296,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.9;
+				MARKETING_VERSION = 1.0.10;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

@@ -55,6 +55,7 @@ private struct WebSetupView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Connect your phone").font(.headline)
                                 Text("Keep both devices on the same private Wi-Fi. Scan the QR code in Safari, compare the approval codes, then choose Trust this phone.")
+                                Text("You can connect multiple phones at once. Scan the QR code on each phone and approve each request separately.")
                                 Text("For a full-screen remote, use Safari → Share → Add to Home Screen. Open that icon, enter the connection code once, and approve it. Future launches reconnect automatically.")
                                 Text("Enable Accessibility to control the Mac. Launch at login starts the receiver when you sign in.")
                                 Text("This remote uses local HTTP. Use trusted private Wi-Fi only, avoid passwords or sensitive text, and never forward its port to the internet.")
@@ -63,14 +64,20 @@ private struct WebSetupView: View {
                 }
                 Text(host.message).foregroundStyle(.secondary)
                 if host.isRunning {
-                    if let code = host.approvalCode {
-                        Text(host.pendingDeviceName).font(.headline)
-                        Text(code).font(.system(size: 36, weight: .semibold, design: .monospaced))
-                        HStack {
-                            Button("Decline") { host.disconnect() }
-                            Button("Trust this phone") { host.approve(); if host.hasPermission { NSApplication.shared.hide(nil) } }.buttonStyle(.borderedProminent)
+                    ForEach(host.pendingDevices) { device in
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(device.name).font(.headline)
+                            Text(device.code).font(.system(size: 36, weight: .semibold, design: .monospaced))
+                            Text("Approve within \(device.expiresIn) seconds. Keep this phone’s remote open.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            HStack {
+                                Button("Decline") { host.decline(device.id) }
+                                Button("Trust this phone") { host.approve(device.id) }.buttonStyle(.borderedProminent)
+                            }
                         }
-                    } else if !host.isApproved {
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Add a device").font(.headline)
                         if let image = qrCode(host.url) {
                             Image(nsImage: image).interpolation(.none).resizable().scaledToFit()
                                 .frame(width: 170, height: 170).padding(12).background(.white)
@@ -86,12 +93,14 @@ private struct WebSetupView: View {
                         }
                     }
                     HStack {
-                        Button("New connection link") { host.disconnect() }
+                        Button("New connection link") { host.newConnectionLink() }
+                            .help("Refresh the QR link and connection code. Connected phones stay connected.")
                         Button("Stop receiver") { host.stop() }
                     }
                 } else {
                     if !host.addresses.isEmpty {
                         Picker("Network address", selection: $host.address) {
+                            if host.address.isEmpty { Text("Choose a network").tag("") }
                             ForEach(host.addresses, id: \.self) { Text($0).tag($0) }
                         }
                     }
@@ -107,7 +116,7 @@ private struct WebSetupView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(device.displayName).lineLimit(2)
-                                Text(host.connectedDeviceID == device.id ? "Connected" : "Offline")
+                                Text(host.connectedDeviceIDs.contains(device.id) ? "Connected" : "Offline")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
